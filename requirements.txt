@@ -1,0 +1,19 @@
+# Content Idea Generator Skill
+# Python dependencies
+
+# Core (no external dependencies needed)
+# sqlite3 - built-in
+# dataclasses - built-in (Python 3.7+)
+# typing - built-in
+
+# Optional: OCR for screenshots
+# pytesseract>=0.3.10
+# Pillow>=9.0.0
+
+# Optional: Testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# Optional: Development
+# black>=22.0.0
+# mypy>=0.990
