@@ -1,0 +1,756 @@
+# SPEC.yaml - Content Idea Generator Database Module
+# TriadDev v3.0 SDD Format
+# SQLite database with FTS5 full-text search
+
+specification:
+  name: "Content Idea Generator - Database Module"
+  version: "1.0.0"
+  description: |
+    SQLite database module with FTS5 full-text search support for the Content Idea Generator skill.
+    Provides CRUD operations for ideas, tags, categories, and content items with ranking-based search.
+  author: "Galatea"
+  created_at: "2026-03-02"
+  
+tdd_config:
+  test_framework: pytest
+  coverage_threshold: 80
+  test_types: [unit, integration]
+  
+interfaces:
+  classes:
+    - name: ContentIdeaDatabase
+      description: "Main database interface for content idea management"
+      methods:
+        - name: __init__
+          signature: "__init__(self, db_path: str) -> None"
+          description: "Initialize database connection and create tables if not exists"
+          parameters:
+            - name: db_path
+              type: str
+              required: true
+              description: "Path to SQLite database file"
+          
+        - name: initialize_schema
+          signature: "initialize_schema(self) -> None"
+          description: "Create all database tables, indexes, and FTS5 virtual tables"
+          
+        - name: close
+          signature: "close(self) -> None"
+          description: "Close database connection"
+          
+        # Category CRUD
+        - name: create_category
+          signature: "create_category(self, name: str, parent_id: Optional[int] = None, color: str = '#808080') -> int"
+          description: "Create a new category"
+          parameters:
+            - name: name
+              type: str
+              required: true
+              description: "Category name"
+            - name: parent_id
+              type: Optional[int]
+              required: false
+              description: "Parent category ID for hierarchical structure"
+            - name: color
+              type: str
+              required: false
+              description: "Category color in hex format"
+          returns:
+            type: int
+            description: "ID of created category"
+            
+        - name: get_category
+          signature: "get_category(self, category_id: int) -> Optional[Dict]"
+          description: "Retrieve category by ID"
+          parameters:
+            - name: category_id
+              type: int
+              required: true
+          returns:
+            type: Optional[Dict]
+            description: "Category data or None if not found"
+            
+        - name: update_category
+          signature: "update_category(self, category_id: int, name: Optional[str] = None, color: Optional[str] = None) -> bool"
+          description: "Update category information"
+          parameters:
+            - name: category_id
+              type: int
+              required: true
+            - name: name
+              type: Optional[str]
+              required: false
+            - name: color
+              type: Optional[str]
+              required: false
+          returns:
+            type: bool
+            description: "True if updated successfully"
+            
+        - name: delete_category
+          signature: "delete_category(self, category_id: int, cascade: bool = False) -> bool"
+          description: "Delete category"
+          parameters:
+            - name: category_id
+              type: int
+              required: true
+            - name: cascade
+              type: bool
+              required: false
+              description: "If True, move children to parent; if False, prevent deletion if has children"
+          returns:
+            type: bool
+            description: "True if deleted successfully"
+            
+        - name: list_categories
+          signature: "list_categories(self, parent_id: Optional[int] = None) -> List[Dict]"
+          description: "List categories, optionally filtered by parent"
+          parameters:
+            - name: parent_id
+              type: Optional[int]
+              required: false
+          returns:
+            type: List[Dict]
+            description: "List of category dictionaries"
+            
+        # Tag CRUD
+        - name: create_tag
+          signature: "create_tag(self, name: str, color: str = '#3498db') -> int"
+          description: "Create a new tag"
+          parameters:
+            - name: name
+              type: str
+              required: true
+            - name: color
+              type: str
+              required: false
+          returns:
+            type: int
+            description: "ID of created tag"
+            
+        - name: get_tag
+          signature: "get_tag(self, tag_id: int) -> Optional[Dict]"
+          description: "Retrieve tag by ID"
+          parameters:
+            - name: tag_id
+              type: int
+              required: true
+          returns:
+            type: Optional[Dict]
+            description: "Tag data or None if not found"
+            
+        - name: get_tag_by_name
+          signature: "get_tag_by_name(self, name: str) -> Optional[Dict]"
+          description: "Retrieve tag by name (case-insensitive)"
+          parameters:
+            - name: name
+              type: str
+              required: true
+          returns:
+            type: Optional[Dict]
+            description: "Tag data or None if not found"
+            
+        - name: update_tag
+          signature: "update_tag(self, tag_id: int, name: Optional[str] = None, color: Optional[str] = None) -> bool"
+          description: "Update tag information"
+          parameters:
+            - name: tag_id
+              type: int
+              required: true
+            - name: name
+              type: Optional[str]
+              required: false
+            - name: color
+              type: Optional[str]
+              required: false
+          returns:
+            type: bool
+            description: "True if updated successfully"
+            
+        - name: delete_tag
+          signature: "delete_tag(self, tag_id: int) -> bool"
+          description: "Delete tag and all its associations"
+          parameters:
+            - name: tag_id
+              type: int
+              required: true
+          returns:
+            type: bool
+            description: "True if deleted successfully"
+            
+        - name: list_tags
+          signature: "list_tags(self, search: Optional[str] = None) -> List[Dict]"
+          description: "List all tags, optionally filtered by name search"
+          parameters:
+            - name: search
+              type: Optional[str]
+              required: false
+              description: "Filter tags by name (partial match)"
+          returns:
+            type: List[Dict]
+            description: "List of tag dictionaries"
+            
+        # Idea CRUD
+        - name: create_idea
+          signature: "create_idea(self, title: str, description: str, category_id: Optional[int] = None, status: str = 'draft', priority: int = 3) -> int"
+          description: "Create a new content idea"
+          parameters:
+            - name: title
+              type: str
+              required: true
+            - name: description
+              type: str
+              required: true
+            - name: category_id
+              type: Optional[int]
+              required: false
+            - name: status
+              type: str
+              required: false
+              description: "One of: draft, ready, in_progress, published, archived"
+            - name: priority
+              type: int
+              required: false
+              description: "Priority 1-5, where 5 is highest"
+          returns:
+            type: int
+            description: "ID of created idea"
+            
+        - name: get_idea
+          signature: "get_idea(self, idea_id: int) -> Optional[Dict]"
+          description: "Retrieve idea by ID with tags"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+          returns:
+            type: Optional[Dict]
+            description: "Idea data with tags list or None"
+            
+        - name: update_idea
+          signature: "update_idea(self, idea_id: int, title: Optional[str] = None, description: Optional[str] = None, category_id: Optional[int] = None, status: Optional[str] = None, priority: Optional[int] = None) -> bool"
+          description: "Update idea information"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+            - name: title
+              type: Optional[str]
+              required: false
+            - name: description
+              type: Optional[str]
+              required: false
+            - name: category_id
+              type: Optional[int]
+              required: false
+            - name: status
+              type: Optional[str]
+              required: false
+            - name: priority
+              type: Optional[int]
+              required: false
+          returns:
+            type: bool
+            description: "True if updated successfully"
+            
+        - name: delete_idea
+          signature: "delete_idea(self, idea_id: int) -> bool"
+          description: "Delete idea and all its tag associations"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+          returns:
+            type: bool
+            description: "True if deleted successfully"
+            
+        - name: list_ideas
+          signature: "list_ideas(self, category_id: Optional[int] = None, status: Optional[str] = None, tag_ids: Optional[List[int]] = None, limit: int = 50, offset: int = 0) -> List[Dict]"
+          description: "List ideas with optional filtering"
+          parameters:
+            - name: category_id
+              type: Optional[int]
+              required: false
+            - name: status
+              type: Optional[str]
+              required: false
+            - name: tag_ids
+              type: Optional[List[int]]
+              required: false
+              description: "Filter by tags (AND logic)"
+            - name: limit
+              type: int
+              required: false
+            - name: offset
+              type: int
+              required: false
+          returns:
+            type: List[Dict]
+            description: "List of idea dictionaries with tags"
+            
+        # Idea-Tag Association
+        - name: add_tag_to_idea
+          signature: "add_tag_to_idea(self, idea_id: int, tag_id: int) -> bool"
+          description: "Associate a tag with an idea"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+            - name: tag_id
+              type: int
+              required: true
+          returns:
+            type: bool
+            description: "True if association created"
+            
+        - name: remove_tag_from_idea
+          signature: "remove_tag_from_idea(self, idea_id: int, tag_id: int) -> bool"
+          description: "Remove tag association from idea"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+            - name: tag_id
+              type: int
+              required: true
+          returns:
+            type: bool
+            description: "True if association removed"
+            
+        - name: get_idea_tags
+          signature: "get_idea_tags(self, idea_id: int) -> List[Dict]"
+          description: "Get all tags associated with an idea"
+          parameters:
+            - name: idea_id
+              type: int
+              required: true
+          returns:
+            type: List[Dict]
+            description: "List of tag dictionaries"
+            
+        # Full-Text Search
+        - name: search_ideas
+          signature: "search_ideas(self, query: str, limit: int = 20) -> List[Dict]"
+          description: "Search ideas using FTS5 with BM25 ranking"
+          parameters:
+            - name: query
+              type: str
+              required: true
+              description: "Search query string"
+            - name: limit
+              type: int
+              required: false
+          returns:
+            type: List[Dict]
+            description: "List of ideas with rank scores"
+            
+        - name: search_by_tag
+          signature: "search_by_tag(self, tag_name: str, limit: int = 20) -> List[Dict]"
+          description: "Search ideas by tag name"
+          parameters:
+            - name: tag_name
+              type: str
+              required: true
+            - name: limit
+              type: int
+              required: false
+          returns:
+            type: List[Dict]
+            description: "List of ideas with the specified tag"
+            
+        # Export
+        - name: export_ideas_to_markdown
+          signature: "export_ideas_to_markdown(self, idea_ids: Optional[List[int]] = None, output_path: Optional[str] = None) -> str"
+          description: "Export ideas to Markdown format"
+          parameters:
+            - name: idea_ids
+              type: Optional[List[int]]
+              required: false
+              description: "Specific idea IDs to export; if None, exports all"
+            - name: output_path
+              type: Optional[str]
+              required: false
+              description: "Output file path; if None, returns markdown string"
+          returns:
+            type: str
+            description: "Markdown content or path to exported file"
+            
+        # Statistics
+        - name: get_statistics
+          signature: "get_statistics(self) -> Dict"
+          description: "Get database statistics"
+          returns:
+            type: Dict
+            description: "Statistics including counts by category, status, tags"
+
+data_models:
+  schemas:
+    - name: categories
+      type: table
+      description: "Hierarchical content categories"
+      columns:
+        - name: id
+          type: INTEGER
+          constraints: PRIMARY KEY AUTOINCREMENT
+        - name: name
+          type: TEXT
+          constraints: NOT NULL UNIQUE
+        - name: parent_id
+          type: INTEGER
+          constraints: FOREIGN KEY REFERENCES categories(id) ON DELETE CASCADE
+        - name: color
+          type: TEXT
+          default: "'#808080'"
+        - name: created_at
+          type: DATETIME
+          default: CURRENT_TIMESTAMP
+        - name: updated_at
+          type: DATETIME
+          default: CURRENT_TIMESTAMP
+      indexes:
+        - name: idx_categories_parent
+          columns: [parent_id]
+          
+    - name: tags
+      type: table
+      description: "Tags for organizing ideas"
+      columns:
+        - name: id
+          type: INTEGER
+          constraints: PRIMARY KEY AUTOINCREMENT
+        - name: name
+          type: TEXT
+          constraints: NOT NULL UNIQUE
+        - name: color
+          type: TEXT
+          default: "'#3498db'"
+        - name: created_at
+          type: DATETIME
+          default: CURRENT_TIMESTAMP
+      indexes:
+        - name: idx_tags_name
+          columns: [name]
+          
+    - name: ideas
+      type: table
+      description: "Content ideas and concepts"
+      columns:
+        - name: id
+          type: INTEGER
+          constraints: PRIMARY KEY AUTOINCREMENT
+        - name: title
+          type: TEXT
+          constraints: NOT NULL
+        - name: description
+          type: TEXT
+          constraints: NOT NULL
+        - name: category_id
+          type: INTEGER
+          constraints: FOREIGN KEY REFERENCES categories(id) ON DELETE SET NULL
+        - name: status
+          type: TEXT
+          default: "'draft'"
+          constraints: CHECK(status IN ('draft', 'ready', 'in_progress', 'published', 'archived'))
+        - name: priority
+          type: INTEGER
+          default: "3"
+          constraints: CHECK(priority BETWEEN 1 AND 5)
+        - name: created_at
+          type: DATETIME
+          default: CURRENT_TIMESTAMP
+        - name: updated_at
+          type: DATETIME
+          default: CURRENT_TIMESTAMP
+      indexes:
+        - name: idx_ideas_category
+          columns: [category_id]
+        - name: idx_ideas_status
+          columns: [status]
+        - name: idx_ideas_priority
+          columns: [priority]
+        - name: idx_ideas_created
+          columns: [created_at]
+          
+    - name: idea_tags
+      type: table
+      description: "Many-to-many relationship between ideas and tags"
+      columns:
+        - name: idea_id
+          type: INTEGER
+          constraints: NOT NULL FOREIGN KEY REFERENCES ideas(id) ON DELETE CASCADE
+        - name: tag_id
+          type: INTEGER
+          constraints: NOT NULL FOREIGN KEY REFERENCES tags(id) ON DELETE CASCADE
+      constraints:
+        - name: pk_idea_tags
+          type: PRIMARY KEY
+          columns: [idea_id, tag_id]
+      indexes:
+        - name: idx_idea_tags_tag
+          columns: [tag_id]
+          
+    - name: ideas_fts
+      type: virtual_table
+      description: "FTS5 virtual table for full-text search"
+      using: FTS5
+      columns:
+        - name: title
+          type: TEXT
+        - name: description
+          type: TEXT
+        - name: content
+          type: TEXT
+          description: "Virtual column for combined search"
+      options:
+        - name: content
+          value: ideas
+        - name: content_rowid
+          value: id
+        
+    - name: v_ideas_full
+      type: view
+      description: "View joining ideas with categories and tags"
+      definition: |
+        SELECT 
+          i.*,
+          c.name as category_name,
+          c.color as category_color,
+          GROUP_CONCAT(t.name) as tags,
+          GROUP_CONCAT(t.color) as tag_colors
+        FROM ideas i
+        LEFT JOIN categories c ON i.category_id = c.id
+        LEFT JOIN idea_tags it ON i.id = it.idea_id
+        LEFT JOIN tags t ON it.tag_id = t.id
+        GROUP BY i.id
+        
+    - name: v_category_tree
+      type: view
+      description: "Hierarchical category tree view"
+      definition: |
+        WITH RECURSIVE category_tree AS (
+          SELECT id, name, parent_id, color, 0 as level, name as path
+          FROM categories
+          WHERE parent_id IS NULL
+          UNION ALL
+          SELECT c.id, c.name, c.parent_id, c.color, ct.level + 1,
+                 ct.path || ' > ' || c.name
+          FROM categories c
+          JOIN category_tree ct ON c.parent_id = ct.id
+        )
+        SELECT * FROM category_tree
+        
+    - name: v_ideas_ready
+      type: view
+      description: "View of ideas ready for content creation"
+      definition: |
+        SELECT * FROM v_ideas_full
+        WHERE status = 'ready'
+        ORDER BY priority DESC, created_at DESC
+
+scenarios:
+  - id: DB-001
+    title: "Create category hierarchy"
+    given: "User wants to organize ideas into hierarchical categories"
+    when: "User creates parent category 'Technology' and child category 'AI'"
+    then: |
+      - Category 'Technology' is created with null parent_id
+      - Category 'AI' is created with parent_id pointing to 'Technology'
+      - Both categories have unique IDs
+      - v_category_tree shows 'Technology > AI' path
+      
+  - id: DB-002
+    title: "Create and retrieve idea with tags"
+    given: "User has created tags 'python' and 'tutorial'"
+    when: "User creates idea 'Building APIs' with both tags"
+    then: |
+      - Idea is created with unique ID
+      - Tags are associated via idea_tags table
+      - get_idea returns idea with tags list
+      - search_by_tag('python') returns the idea
+      
+  - id: DB-003
+    title: "Full-text search with ranking"
+    given: "Database contains ideas about 'machine learning' and 'deep learning'"
+    when: "User searches for 'learning algorithms'"
+    then: |
+      - FTS5 query returns matching ideas
+      - Results are ranked by BM25 relevance
+      - Higher rank for ideas with both terms
+      - search_ideas returns ideas with rank scores
+      
+  - id: DB-004
+    title: "Update idea status and priority"
+    given: "Idea exists with status 'draft' and priority 3"
+    when: "User updates status to 'ready' and priority to 5"
+    then: |
+      - update_idea returns True
+      - get_idea shows updated status and priority
+      - v_ideas_ready includes the idea
+      - updated_at timestamp is refreshed
+      
+  - id: DB-005
+    title: "Cascade delete category with ideas"
+    given: "Category 'Drafts' exists with multiple ideas"
+    when: "User deletes the category with cascade=True"
+    then: |
+      - Category is removed from database
+      - Associated ideas have category_id set to NULL
+      - No orphaned records in idea_tags
+      - delete_category returns True
+      
+  - id: DB-006
+    title: "Export ideas to Markdown"
+    given: "Multiple ideas exist with tags and categories"
+    when: "User calls export_ideas_to_markdown()"
+    then: |
+      - Markdown content is generated with proper formatting
+      - Each idea includes title, description, tags, category
+      - Ideas are grouped by category
+      - Output includes creation timestamps
+      
+  - id: DB-007
+    title: "Prevent duplicate tag names"
+    given: "Tag 'important' already exists"
+    when: "User attempts to create another tag named 'Important' (case-insensitive)"
+    then: |
+      - get_tag_by_name('Important') returns existing tag
+      - create_tag raises IntegrityError or returns existing ID
+      - No duplicate tags in database
+      
+  - id: DB-008
+    title: "Filter ideas by multiple criteria"
+    given: "Ideas exist with various statuses, priorities, and tags"
+    when: "User lists ideas with status='ready', priority>=4, tag_ids=[1,2]"
+    then: |
+      - list_ideas returns filtered results
+      - Only ideas matching ALL criteria are returned
+      - Results include pagination support (limit/offset)
+      - Total count available for pagination
+
+tests:
+  acceptance_criteria:
+    - id: TEST-001
+      requirement_id: DB-001
+      name: "test_create_category_hierarchy"
+      description: "Verify parent-child category relationships"
+      steps:
+        - "Create parent category 'Technology'"
+        - "Create child category 'AI' with parent_id"
+        - "Verify v_category_tree shows correct path"
+      expected: "Hierarchical structure maintained correctly"
+      
+    - id: TEST-002
+      requirement_id: DB-002
+      name: "test_idea_with_tags"
+      description: "Verify idea-tag associations"
+      steps:
+        - "Create two tags"
+        - "Create idea with tag IDs"
+        - "Verify associations in idea_tags table"
+        - "Verify get_idea returns tags"
+      expected: "Tags correctly associated and retrievable"
+      
+    - id: TEST-003
+      requirement_id: DB-003
+      name: "test_fts_search_ranking"
+      description: "Verify FTS5 search with BM25 ranking"
+      steps:
+        - "Insert test ideas with searchable content"
+        - "Execute search query"
+        - "Verify results ordered by relevance"
+      expected: "Results ranked by BM25 score, most relevant first"
+      
+    - id: TEST-004
+      requirement_id: DB-004
+      name: "test_update_idea"
+      description: "Verify idea updates and timestamp refresh"
+      steps:
+        - "Create idea with initial values"
+        - "Update status and priority"
+        - "Verify updated_at changed"
+      expected: "All fields updated, timestamp refreshed"
+      
+    - id: TEST-005
+      requirement_id: DB-005
+      name: "test_category_cascade_delete"
+      description: "Verify cascade behavior on category delete"
+      steps:
+        - "Create category with ideas"
+        - "Delete category with cascade=True"
+        - "Verify ideas have NULL category_id"
+      expected: "Ideas preserved but unlinked from deleted category"
+      
+    - id: TEST-006
+      requirement_id: DB-006
+      name: "test_markdown_export"
+      description: "Verify Markdown export format"
+      steps:
+        - "Create sample ideas with metadata"
+        - "Call export_ideas_to_markdown"
+        - "Verify Markdown structure"
+      expected: "Valid Markdown with proper headers and formatting"
+      
+    - id: TEST-007
+      requirement_id: DB-007
+      name: "test_tag_uniqueness"
+      description: "Verify tag name uniqueness constraint"
+      steps:
+        - "Create tag 'test'"
+        - "Attempt to create 'TEST' (case-insensitive)"
+        - "Verify appropriate error handling"
+      expected: "Duplicate prevention enforced"
+      
+    - id: TEST-008
+      requirement_id: DB-008
+      name: "test_filtered_list"
+      description: "Verify multi-criteria filtering"
+      steps:
+        - "Create ideas with various attributes"
+        - "Apply multiple filter criteria"
+        - "Verify pagination works"
+      expected: "Correct filtered results with pagination"
+      
+    - id: TEST-009
+      name: "test_database_initialization"
+      description: "Verify schema creation on init"
+      steps:
+        - "Initialize ContentIdeaDatabase with new path"
+        - "Verify all tables exist"
+        - "Verify FTS5 virtual table created"
+      expected: "All schema objects created successfully"
+      
+    - id: TEST-010
+      name: "test_statistics"
+      description: "Verify statistics aggregation"
+      steps:
+        - "Create sample data across all tables"
+        - "Call get_statistics()"
+        - "Verify counts match expected values"
+      expected: "Accurate statistics returned"
+      
+    - id: TEST-011
+      name: "test_fts_trigger_sync"
+      description: "Verify FTS index stays synchronized"
+      steps:
+        - "Create idea"
+        - "Update idea title/description"
+        - "Delete idea"
+        - "Verify FTS index reflects changes"
+      expected: "FTS index synchronized with main table"
+      
+    - id: TEST-012
+      name: "test_concurrent_access"
+      description: "Verify thread safety"
+      steps:
+        - "Perform concurrent read/write operations"
+        - "Verify no database locks or corruption"
+      expected: "Thread-safe operations without conflicts"
+
+implementation_notes:
+  - "Use sqlite3 module with check_same_thread=False for threading support"
+  - "Enable foreign key constraints: PRAGMA foreign_keys = ON"
+  - "Create triggers to sync ideas_fts with ideas table"
+  - "Use parameterized queries to prevent SQL injection"
+  - "Implement connection pooling for concurrent access"
+  - "Add logging for database operations"
+  - "Consider WAL mode for better concurrency: PRAGMA journal_mode = WAL"

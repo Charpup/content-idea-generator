@@ -1,0 +1,48 @@
+# Content Idea Generator - Python Dependencies
+
+# Core dependencies (usually included with Python)
+# sqlite3  # Built-in
+# json     # Built-in
+# re       # Built-in
+# pathlib  # Built-in
+# typing   # Built-in
+# contextlib  # Built-in
+# datetime    # Built-in
+# collections # Built-in
+# math        # Built-in
+# random      # Built-in
+# tempfile    # Built-in
+# shutil      # Built-in
+# unittest    # Built-in
+
+# NLP and Text Processing
+nltk>=3.8.0
+
+# Machine Learning and Analysis
+scikit-learn>=1.3.0
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Optional: Advanced keyword extraction
+# rake-nltk>=1.0.6
+# yake>=0.4.8
+
+# Optional: URL fetching
+# requests>=2.31.0
+# beautifulsoup4>=4.12.0
+
+# Optional: Enhanced entity recognition
+# spacy>=3.7.0
+# en-core-web-sm>=3.7.0  # Run: python -m spacy download en_core_web_sm
+
+# Optional: Progress bars
+# tqdm>=4.66.0
+
+# Optional: YAML parsing (if not using built-in)
+# PyYAML>=6.0.1
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.5.0

@@ -1,0 +1,77 @@
+# Content Idea Generator Configuration
+
+# Database settings
+database:
+  path: "~/.openclaw/content-ideas.db"
+  backup_interval_days: 7
+  enable_fts5: true  # Full-text search support
+
+# Capture settings
+capture:
+  default_category: "Uncategorized"
+  auto_extract_snippets: true
+  max_snippet_length: 1000
+  default_priority: 3
+  default_status: "active"
+
+# Analysis settings
+analysis:
+  enabled: true
+  schedule: "0 9 * * *"  # Daily at 9 AM (cron expression)
+  min_cluster_size: 2
+  max_clusters: 10
+  similarity_threshold: 0.4
+  max_suggestions: 5
+  draft_formats:
+    - short      # Twitter-style
+    - medium     # LinkedIn-style
+    - long       # Blog post
+
+# NLP settings
+nlp:
+  language: "english"
+  extract_keywords: true
+  max_keywords: 10
+  sentiment_analysis: true
+  entity_recognition: false  # Requires additional setup
+  
+  # Keyword extraction settings
+  keyword_extraction:
+    method: "tfidf"  # tfidf | rake | yake
+    remove_stopwords: true
+    min_word_length: 3
+
+# Export settings
+export:
+  obsidian_vault_path: "~/Obsidian/Vault"
+  export_format: "markdown"
+  include_metadata: true
+  include_snippets: true
+  include_gold_sentences: true
+  include_ideas: true
+  
+  # Markdown formatting
+  markdown:
+    template: "default"  # default | minimal | detailed
+    use_wikilinks: true
+    tag_prefix: "#"
+
+# Chat interface settings
+chat:
+  max_suggestions_display: 3
+  enable_draft_previews: true
+  emoji_indicators: true
+  max_message_length: 2000
+  
+  # Response templates
+  templates:
+    greeting: "👋 Welcome to Content Idea Generator!"
+    no_results: "🔍 No results found. Try a different search?"
+    analysis_complete: "📊 Analysis complete! Found {clusters} clusters and {suggestions} suggestions."
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  file: "~/.openclaw/logs/content-idea-generator.log"
+  max_size_mb: 10
+  backup_count: 5
