@@ -1,0 +1,663 @@
+# Content Idea Generator - Analysis Engine Specification
+# OpenSpec-inspired format
+# Version: 1.0.0
+
+specification:
+  name: "Content Idea Generator - Analysis Engine"
+  version: "1.0.0"
+  description: |
+    Analysis Engine module for Content Idea Generator skill.
+    Provides intelligent content analysis including HAC clustering,
+    TF-IDF feature extraction, similarity calculation, topic suggestion,
+    keyword extraction, and daily analysis pipeline.
+  author: "Galatea"
+  module: "analysis"
+  parent_skill: "content-idea-generator"
+  
+tdd_config:
+  test_framework: pytest
+  coverage_threshold: 80
+  test_types: [unit, integration]
+  
+requirements:
+  # === Functional Requirements ===
+  
+  - id: ANALYSIS-001
+    category: functional
+    priority: high
+    description: "Hierarchical Agglomerative Clustering (HAC) for idea grouping"
+    acceptance_criteria:
+      - "Accept list of idea objects with text content"
+      - "Generate hierarchical clusters based on content similarity"
+      - "Support configurable linkage method (single, complete, average, ward)"
+      - "Return cluster assignments with dendrogram structure"
+      - "Handle minimum cluster size constraints"
+    
+  - id: ANALYSIS-002
+    category: functional
+    priority: high
+    description: "TF-IDF feature extraction from text content"
+    acceptance_criteria:
+      - "Accept raw text input from ideas"
+      - "Tokenize and preprocess text (lowercase, remove stopwords)"
+      - "Calculate term frequency (TF) for each document"
+      - "Calculate inverse document frequency (IDF) across corpus"
+      - "Generate TF-IDF vectors with configurable max_features"
+      - "Return sparse matrix representation of features"
+    
+  - id: ANALYSIS-003
+    category: functional
+    priority: high
+    description: "Content similarity calculation using cosine similarity"
+    acceptance_criteria:
+      - "Accept TF-IDF vectors or raw text pairs"
+      - "Compute cosine similarity score between 0 and 1"
+      - "Support batch similarity matrix computation"
+      - "Handle edge cases (empty text, identical content)"
+      - "Return similarity scores with corresponding idea IDs"
+    
+  - id: ANALYSIS-004
+    category: functional
+    priority: high
+    description: "Topic suggestion generation based on clusters"
+    acceptance_criteria:
+      - "Accept cluster assignments from HAC"
+      - "Analyze cluster content to extract common themes"
+      - "Generate human-readable topic labels"
+      - "Suggest content series based on cluster density"
+      - "Return suggestions with confidence scores (0-100%)"
+      - "Include related idea references for each suggestion"
+    
+  - id: ANALYSIS-005
+    category: functional
+    priority: medium
+    description: "Keyword extraction from content"
+    acceptance_criteria:
+      - "Accept single or multiple text inputs"
+      - "Extract keywords using TF-IDF scoring"
+      - "Support N-gram extraction (unigrams, bigrams, trigrams)"
+      - "Filter by minimum TF-IDF threshold"
+      - "Return ranked keyword list with scores"
+      - "Deduplicate semantically similar keywords"
+    
+  - id: ANALYSIS-006
+    category: functional
+    priority: high
+    description: "Daily analysis pipeline execution"
+    acceptance_criteria:
+      - "Trigger automatically at configured time (default 09:00)"
+      - "Fetch ideas created since last analysis"
+      - "Execute full analysis workflow (TF-IDF → HAC → Suggestions)"
+      - "Generate structured report with stats and insights"
+      - "Persist analysis results to database"
+      - "Return report object for chat formatting"
+    
+  # === Non-Functional Requirements ===
+  
+  - id: ANALYSIS-NFR-001
+    category: non-functional
+    priority: high
+    description: "Performance requirements for analysis operations"
+    acceptance_criteria:
+      - "TF-IDF extraction: < 100ms for 100 ideas"
+      - "HAC clustering: < 500ms for 100 ideas"
+      - "Similarity calculation: < 50ms for pairwise comparison"
+      - "Daily pipeline: < 5 seconds for 500 ideas"
+      - "Memory usage: < 256MB for typical dataset"
+    
+  - id: ANALYSIS-NFR-002
+    category: non-functional
+    priority: medium
+    description: "Scalability requirements"
+    acceptance_criteria:
+      - "Support up to 10,000 ideas in corpus"
+      - "Incremental analysis for new ideas only"
+      - "Configurable batch size for large datasets"
+      - "Graceful degradation for memory constraints"
+    
+  - id: ANALYSIS-NFR-003
+    category: non-functional
+    priority: high
+    description: "Accuracy requirements"
+    acceptance_criteria:
+      - "Clustering silhouette score > 0.5"
+      - "Topic suggestion relevance > 70% (manual evaluation)"
+      - "Keyword precision > 80% for top-5 keywords"
+      - "Similarity scores correlate with human judgment (Spearman ρ > 0.7)"
+    
+  - id: ANALYSIS-NFR-004
+    category: non-functional
+    priority: medium
+    description: "Reliability and error handling"
+    acceptance_criteria:
+      - "Graceful handling of empty input"
+      - "Recovery from partial analysis failure"
+      - "Detailed error logging for debugging"
+      - "Fallback to simpler algorithms on resource constraints"
+
+architecture:
+  # === Module Interfaces ===
+  
+  interfaces:
+    - name: "AnalysisEngine"
+      type: class
+      description: "Main entry point for analysis operations"
+      methods:
+        - name: "analyze_daily"
+          signature: "analyze_daily(ideas: List[Idea], config: AnalysisConfig) -> DailyReport"
+          description: "Execute full daily analysis pipeline"
+          
+        - name: "cluster_ideas"
+          signature: "cluster_ideas(ideas: List[Idea], n_clusters: int, linkage: str) -> ClusterResult"
+          description: "Perform HAC clustering on ideas"
+          
+        - name: "extract_keywords"
+          signature: "extract_keywords(texts: List[str], top_k: int, ngram_range: Tuple[int,int]) -> List[KeywordResult]"
+          description: "Extract keywords from text content"
+          
+        - name: "calculate_similarity"
+          signature: "calculate_similarity(idea_a: Idea, idea_b: Idea) -> float"
+          description: "Calculate cosine similarity between two ideas"
+          
+        - name: "generate_suggestions"
+          signature: "generate_suggestions(clusters: ClusterResult, min_confidence: float) -> List[Suggestion]"
+          description: "Generate content suggestions from clusters"
+    
+    - name: "TFIDFExtractor"
+      type: class
+      description: "TF-IDF feature extraction component"
+      methods:
+        - name: "fit_transform"
+          signature: "fit_transform(texts: List[str]) -> scipy.sparse.csr_matrix"
+          description: "Fit vectorizer and transform texts to TF-IDF matrix"
+          
+        - name: "get_feature_names"
+          signature: "get_feature_names() -> List[str]"
+          description: "Return feature names (terms) in vocabulary"
+          
+        - name: "get_top_terms"
+          signature: "get_top_terms(doc_idx: int, n: int) -> List[Tuple[str, float]]"
+          description: "Get top N terms for specific document"
+    
+    - name: "HACClusterer"
+      type: class
+      description: "Hierarchical Agglomerative Clustering component"
+      methods:
+        - name: "fit_predict"
+          signature: "fit_predict(vectors: scipy.sparse.csr_matrix) -> np.ndarray"
+          description: "Fit clustering model and return cluster labels"
+          
+        - name: "get_dendrogram"
+          signature: "get_dendrogram() -> Dict"
+          description: "Return dendrogram structure for visualization"
+          
+        - name: "get_cluster_centers"
+          signature: "get_cluster_centers() -> np.ndarray"
+          description: "Return centroid vectors for each cluster"
+    
+    - name: "SimilarityCalculator"
+      type: class
+      description: "Cosine similarity computation component"
+      methods:
+        - name: "compute_pairwise"
+          signature: "compute_pairwise(vectors: scipy.sparse.csr_matrix) -> np.ndarray"
+          description: "Compute pairwise cosine similarity matrix"
+          
+        - name: "compute_single"
+          signature: "compute_single(vec_a: np.ndarray, vec_b: np.ndarray) -> float"
+          description: "Compute similarity between two vectors"
+          
+        - name: "find_similar"
+          signature: "find_similar(query: Idea, candidates: List[Idea], threshold: float, top_k: int) -> List[Tuple[Idea, float]]"
+          description: "Find most similar ideas to query"
+    
+    - name: "SuggestionGenerator"
+      type: class
+      description: "Topic suggestion generation component"
+      methods:
+        - name: "generate_from_clusters"
+          signature: "generate_from_clusters(clusters: ClusterResult, ideas: List[Idea]) -> List[Suggestion]"
+          description: "Generate suggestions from cluster analysis"
+          
+        - name: "label_cluster"
+          signature: "label_cluster(cluster_ideas: List[Idea]) -> str"
+          description: "Generate human-readable label for cluster"
+    
+    - name: "DailyPipeline"
+      type: class
+      description: "Orchestrates daily analysis workflow"
+      methods:
+        - name: "run"
+          signature: "run(ideas: List[Idea]) -> DailyReport"
+          description: "Execute complete daily analysis pipeline"
+          
+        - name: "should_run"
+          signature: "should_run(last_run: datetime, schedule: str) -> bool"
+          description: "Check if analysis should run based on schedule"
+  
+  # === Data Models ===
+  
+  data_models:
+    - name: "Idea"
+      fields:
+        - { name: "id", type: "str", description: "Unique identifier" }
+        - { name: "content", type: "str", description: "Idea text content" }
+        - { name: "tags", type: "List[str]", description: "User-assigned tags" }
+        - { name: "source", type: "str", description: "Input source (text/voice/image)" }
+        - { name: "created_at", type: "datetime", description: "Creation timestamp" }
+        - { name: "vector", type: "Optional[np.ndarray]", description: "Cached TF-IDF vector" }
+    
+    - name: "ClusterResult"
+      fields:
+        - { name: "labels", type: "np.ndarray", description: "Cluster assignment for each idea" }
+        - { name: "n_clusters", type: "int", description: "Number of clusters" }
+        - { name: "dendrogram", type: "Dict", description: "Hierarchical structure" }
+        - { name: "silhouette_score", type: "float", description: "Clustering quality metric" }
+    
+    - name: "Suggestion"
+      fields:
+        - { name: "topic", type: "str", description: "Suggested content topic" }
+        - { name: "confidence", type: "float", description: "Confidence score (0-1)" }
+        - { name: "related_idea_ids", type: "List[str]", description: "Related idea references" }
+        - { name: "suggested_format", type: "str", description: "Recommended content format" }
+    
+    - name: "KeywordResult"
+      fields:
+        - { name: "keyword", type: "str", description: "Extracted keyword" }
+        - { name: "score", type: "float", description: "TF-IDF score" }
+        - { name: "ngram_size", type: "int", description: "N-gram length" }
+    
+    - name: "DailyReport"
+      fields:
+        - { name: "date", type: "datetime", description: "Report generation time" }
+        - { name: "total_ideas", type: "int", description: "Total ideas analyzed" }
+        - { name: "new_ideas", type: "int", description: "New ideas since last report" }
+        - { name: "clusters", type: "ClusterResult", description: "Clustering results" }
+        - { name: "suggestions", type: "List[Suggestion]", description: "Content suggestions" }
+        - { name: "top_keywords", type: "List[KeywordResult]", description: "Most frequent keywords" }
+        - { name: "stats", type: "Dict", description: "Additional statistics" }
+    
+    - name: "AnalysisConfig"
+      fields:
+        - { name: "max_features", type: "int", default: 1000, description: "Max TF-IDF features" }
+        - { name: "n_clusters", type: "int", default: "auto", description: "Number of clusters (auto or int)" }
+        - { name: "linkage", type: "str", default: "average", description: "HAC linkage method" }
+        - { name: "min_cluster_size", type: "int", default: 2, description: "Minimum ideas per cluster" }
+        - { name: "similarity_threshold", type: "float", default: 0.5, description: "Min similarity for suggestions" }
+        - { name: "schedule", type: "str", default: "09:00", description: "Daily run time" }
+  
+  # === Algorithms ===
+  
+  algorithms:
+    - name: "TF-IDF Feature Extraction"
+      description: "Convert text to numerical features using Term Frequency-Inverse Document Frequency"
+      inputs:
+        - { name: "texts", type: "List[str]", description: "List of text documents" }
+        - { name: "max_features", type: "int", description: "Maximum number of features" }
+        - { name: "ngram_range", type: "Tuple[int,int]", description: "N-gram range (min, max)" }
+        - { name: "stop_words", type: "Union[str,List[str]]", description: "Stop words to remove" }
+      outputs:
+        - { name: "tfidf_matrix", type: "scipy.sparse.csr_matrix", description: "Sparse TF-IDF matrix (n_docs x n_features)" }
+        - { name: "feature_names", type: "List[str]", description: "Feature names corresponding to columns" }
+        - { name: "vocabulary_", type: "Dict[str,int]", description: "Term to index mapping" }
+      implementation: "sklearn.feature_extraction.text.TfidfVectorizer"
+      
+    - name: "Hierarchical Agglomerative Clustering"
+      description: "Bottom-up clustering that merges similar clusters iteratively"
+      inputs:
+        - { name: "vectors", type: "scipy.sparse.csr_matrix", description: "Document vectors (TF-IDF)" }
+        - { name: "n_clusters", type: "int", description: "Target number of clusters" }
+        - { name: "linkage", type: "str", description: "Linkage criterion (single/complete/average/ward)" }
+        - { name: "metric", type: "str", description: "Distance metric (cosine/euclidean)" }
+      outputs:
+        - { name: "labels", type: "np.ndarray", description: "Cluster label for each document" }
+        - { name: "children_", type: "np.ndarray", description: "Dendrogram structure" }
+        - { name: "distances_", type: "np.ndarray", description: "Merge distances" }
+      implementation: "sklearn.cluster.AgglomerativeClustering"
+      
+    - name: "Cosine Similarity"
+      description: "Measure cosine of angle between two non-zero vectors"
+      inputs:
+        - { name: "X", type: "Union[sparse_matrix, ndarray]", description: "First vector or matrix" }
+        - { name: "Y", type: "Union[sparse_matrix, ndarray]", description: "Second vector or matrix" }
+        - { name: "dense_output", type: "bool", description: "Return dense matrix" }
+      outputs:
+        - { name: "similarity", type: "Union[float, np.ndarray]", description: "Cosine similarity (0-1)" }
+      implementation: "sklearn.metrics.pairwise.cosine_similarity"
+      
+    - name: "Keyword Extraction"
+      description: "Extract important keywords using TF-IDF scores"
+      inputs:
+        - { name: "tfidf_matrix", type: "scipy.sparse.csr_matrix", description: "TF-IDF matrix" }
+        - { name: "feature_names", type: "List[str]", description: "Feature names" }
+        - { name: "doc_idx", type: "int", description: "Document index" }
+        - { name: "top_k", type: "int", description: "Number of keywords to extract" }
+      outputs:
+        - { name: "keywords", type: "List[Tuple[str,float]]", description: "Keyword and score pairs" }
+      implementation: "Custom: extract top-k features by TF-IDF score"
+      
+    - name: "Topic Suggestion Generation"
+      description: "Generate content suggestions from cluster analysis"
+      inputs:
+        - { name: "clusters", type: "ClusterResult", description: "HAC clustering results" }
+        - { name: "ideas", type: "List[Idea]", description: "Original ideas" }
+        - { name: "min_confidence", type: "float", description: "Minimum confidence threshold" }
+      outputs:
+        - { name: "suggestions", type: "List[Suggestion]", description: "Generated suggestions" }
+      implementation: "Custom: analyze cluster centroids and extract common terms"
+      
+    - name: "Daily Analysis Pipeline"
+      description: "Orchestrate complete daily analysis workflow"
+      steps:
+        - "Fetch new ideas since last analysis"
+        - "Preprocess and tokenize text"
+        - "Extract TF-IDF features"
+        - "Compute pairwise similarities"
+        - "Perform HAC clustering"
+        - "Generate topic suggestions"
+        - "Extract top keywords"
+        - "Compile daily report"
+      inputs:
+        - { name: "ideas", type: "List[Idea]", description: "All ideas to analyze" }
+        - { name: "config", type: "AnalysisConfig", description: "Analysis configuration" }
+      outputs:
+        - { name: "report", type: "DailyReport", description: "Complete analysis report" }
+      implementation: "Custom: sequential pipeline with error handling"
+
+test_strategy:
+  unit_tests:
+    description: "Test individual components in isolation"
+    scope:
+      - "TFIDFExtractor methods"
+      - "HACClusterer methods"
+      - "SimilarityCalculator methods"
+      - "SuggestionGenerator methods"
+      - "Data model validation"
+    mocking:
+      - "Database calls"
+      - "External services"
+      - "File system operations"
+    coverage_target: 85
+    
+  integration_tests:
+    description: "Test component interactions and pipeline"
+    scope:
+      - "TF-IDF → HAC integration"
+      - "Similarity → Clustering integration"
+      - "Full pipeline execution"
+      - "Database persistence"
+    fixtures:
+      - "Sample idea datasets (small, medium, large)"
+      - "Pre-computed TF-IDF matrices"
+      - "Mock AnalysisConfig"
+    coverage_target: 75
+    
+  acceptance_tests:
+    description: "End-to-end validation of requirements"
+    scope:
+      - "Daily analysis pipeline (ANALYSIS-006)"
+      - "Topic suggestion quality (ANALYSIS-004)"
+      - "Performance requirements (ANALYSIS-NFR-001)"
+    criteria:
+      - "All functional requirements validated"
+      - "Performance benchmarks met"
+      - "Accuracy thresholds achieved"
+    
+  coverage_targets:
+    overall: 80
+    by_module:
+      - { module: "tfidf_extractor", target: 85 }
+      - { module: "hac_clusterer", target: 85 }
+      - { module: "similarity_calculator", target: 80 }
+      - { module: "suggestion_generator", target: 75 }
+      - { module: "daily_pipeline", target: 80 }
+      
+  test_data:
+    - name: "small_dataset"
+      size: 10
+      description: "10 ideas, 3 clusters"
+    - name: "medium_dataset"
+      size: 100
+      description: "100 ideas, 10 clusters"
+    - name: "large_dataset"
+      size: 500
+      description: "500 ideas, performance testing"
+    - name: "edge_cases"
+      description: "Empty input, single idea, identical content"
+
+test_cases:
+  # === Unit Tests ===
+  
+  - id: TC-001
+    name: "TF-IDF extraction with valid text"
+    requirement_id: ANALYSIS-002
+    type: unit
+    description: "Verify TF-IDF vectorizer correctly extracts features from text"
+    given:
+      - "List of 5 text documents with varying content"
+      - "max_features=100, ngram_range=(1,2)"
+    when:
+      - "Call TFIDFExtractor.fit_transform(texts)"
+    then:
+      - "Returns sparse matrix with shape (5, <=100)"
+      - "Feature names contain unigrams and bigrams"
+      - "All documents have non-zero vectors"
+      - "Common words have lower scores than unique terms"
+    
+  - id: TC-002
+    name: "HAC clustering with TF-IDF vectors"
+    requirement_id: ANALYSIS-001
+    type: unit
+    description: "Verify HAC correctly clusters similar documents"
+    given:
+      - "TF-IDF matrix from 10 documents (3 distinct topics)"
+      - "n_clusters=3, linkage='average'"
+    when:
+      - "Call HACClusterer.fit_predict(vectors)"
+    then:
+      - "Returns array of 10 cluster labels (0, 1, or 2)"
+      - "Documents on same topic have same label"
+      - "Silhouette score > 0.5"
+      - "Dendrogram structure is valid"
+    
+  - id: TC-003
+    name: "Cosine similarity calculation"
+    requirement_id: ANALYSIS-003
+    type: unit
+    description: "Verify cosine similarity produces correct scores"
+    given:
+      - "Two identical TF-IDF vectors"
+      - "Two orthogonal TF-IDF vectors"
+      - "Two partially similar TF-IDF vectors"
+    when:
+      - "Call SimilarityCalculator.compute_single() for each pair"
+    then:
+      - "Identical vectors: similarity = 1.0"
+      - "Orthogonal vectors: similarity = 0.0"
+      - "Partial vectors: 0.0 < similarity < 1.0"
+      - "All scores within valid range [0, 1]"
+    
+  - id: TC-004
+    name: "Keyword extraction ranking"
+    requirement_id: ANALYSIS-005
+    type: unit
+    description: "Verify keyword extraction returns ranked keywords"
+    given:
+      - "Single document about 'machine learning'"
+      - "TF-IDF matrix and feature names"
+      - "top_k=5, ngram_range=(1,2)"
+    when:
+      - "Call extract_keywords() on document"
+    then:
+      - "Returns exactly 5 keywords"
+      - "Keywords sorted by TF-IDF score (descending)"
+      - "'machine learning' or 'learning' in top keywords"
+      - "All scores are positive floats"
+    
+  - id: TC-005
+    name: "Topic suggestion generation"
+    requirement_id: ANALYSIS-004
+    type: unit
+    description: "Verify suggestion generator produces relevant topics"
+    given:
+      - "ClusterResult with 3 clusters"
+      - "10 ideas distributed across clusters"
+      - "min_confidence=0.7"
+    when:
+      - "Call SuggestionGenerator.generate_from_clusters()"
+    then:
+      - "Returns at least one suggestion per cluster"
+      - "Each suggestion has confidence >= 0.7"
+      - "Topic labels are non-empty strings"
+      - "Related idea IDs reference existing ideas"
+    
+  # === Integration Tests ===
+  
+  - id: TC-006
+    name: "Full pipeline with medium dataset"
+    requirement_id: ANALYSIS-006
+    type: integration
+    description: "Verify complete pipeline execution"
+    given:
+      - "100 ideas with varied content"
+      - "AnalysisConfig with default settings"
+    when:
+      - "Call DailyPipeline.run(ideas)"
+    then:
+      - "Returns DailyReport object"
+      - "Report contains clusters, suggestions, keywords"
+      - "total_ideas = 100"
+      - "Execution time < 5 seconds"
+    
+  - id: TC-007
+    name: "TF-IDF to HAC integration"
+    requirement_id: [ANALYSIS-001, ANALYSIS-002]
+    type: integration
+    description: "Verify TF-IDF output feeds correctly into HAC"
+    given:
+      - "Raw text documents"
+      - "Connected TFIDFExtractor → HACClusterer"
+    when:
+      - "Extract features then cluster"
+    then:
+      - "No shape mismatch errors"
+      - "Clusters reflect content similarity"
+      - "Pipeline completes without errors"
+    
+  # === Edge Case Tests ===
+  
+  - id: TC-008
+    name: "Empty input handling"
+    requirement_id: ANALYSIS-NFR-004
+    type: unit
+    description: "Verify graceful handling of empty input"
+    given:
+      - "Empty list of ideas"
+    when:
+      - "Call any analysis method"
+    then:
+      - "Returns empty result (not crash)"
+      - "Logs appropriate warning"
+      - "No exceptions raised"
+    
+  - id: TC-009
+    name: "Single idea clustering"
+    requirement_id: ANALYSIS-001
+    type: unit
+    description: "Verify HAC with single document"
+    given:
+      - "Single idea"
+      - "n_clusters=auto"
+    when:
+      - "Call cluster_ideas()"
+    then:
+      - "Returns single cluster label"
+      - "Silhouette score is NaN (single sample)"
+      - "No division by zero errors"
+    
+  - id: TC-010
+    name: "Identical content similarity"
+    requirement_id: ANALYSIS-003
+    type: unit
+    description: "Verify similarity with identical content"
+    given:
+      - "Two ideas with identical text"
+    when:
+      - "Calculate similarity"
+    then:
+      - "Similarity = 1.0 (exact match)"
+      - "Not NaN or infinite"
+    
+  # === Performance Tests ===
+  
+  - id: TC-011
+    name: "TF-IDF performance benchmark"
+    requirement_id: ANALYSIS-NFR-001
+    type: performance
+    description: "Verify TF-IDF meets performance requirements"
+    given:
+      - "100 ideas with average 50 words each"
+    when:
+      - "Measure fit_transform() execution time"
+    then:
+      - "Execution time < 100ms"
+      - "Memory usage < 50MB"
+    
+  - id: TC-012
+    name: "Daily pipeline performance"
+    requirement_id: ANALYSIS-NFR-001
+    type: performance
+    description: "Verify pipeline meets performance requirements"
+    given:
+      - "500 ideas dataset"
+    when:
+      - "Execute full DailyPipeline.run()"
+    then:
+      - "Total execution time < 5 seconds"
+      - "Memory usage < 256MB"
+      - "No timeout errors"
+
+dependencies:
+  required:
+    - { name: "numpy", version: ">=1.21.0", purpose: "Numerical operations" }
+    - { name: "scipy", version: ">=1.7.0", purpose: "Sparse matrices, clustering" }
+    - { name: "scikit-learn", version: ">=1.0.0", purpose: "TF-IDF, HAC, similarity" }
+    - { name: "pandas", version: ">=1.3.0", purpose: "Data manipulation" }
+  
+  optional:
+    - { name: "nltk", version: ">=3.6", purpose: "Advanced text preprocessing" }
+    - { name: "spacy", version: ">=3.0", purpose: "NLP enhancements" }
+    - { name: "pytest-benchmark", version: ">=3.4", purpose: "Performance testing" }
+
+notes: |
+  ## Implementation Notes
+  
+  1. **Scikit-learn Integration**: Use sklearn's TfidfVectorizer and 
+     AgglomerativeClustering for core algorithms. These are well-tested
+     and optimized implementations.
+  
+  2. **Sparse Matrix Efficiency**: TF-IDF matrices are sparse. Use
+     scipy.sparse formats throughout to minimize memory usage.
+  
+  3. **Incremental Analysis**: For large datasets, consider caching
+     TF-IDF vectors and only recomputing for new ideas.
+  
+  4. **Cluster Number Selection**: When n_clusters='auto', use
+     silhouette analysis or elbow method to determine optimal k.
+  
+  5. **Text Preprocessing**: Default tokenizer should handle:
+     - Lowercasing
+     - Punctuation removal
+     - Stop word removal (English default, configurable)
+     - Minimum document frequency filtering
+  
+  6. **Error Recovery**: Pipeline should continue even if individual
+     components fail, logging errors for debugging.
+  
+  ## Future Enhancements
+  
+  - Multi-language support for TF-IDF (Chinese, Japanese, etc.)
+  - Semantic similarity using sentence embeddings
+  - Dynamic cluster number selection
+  - Real-time analysis updates
+  - Distributed processing for very large datasets

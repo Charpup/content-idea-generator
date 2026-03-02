@@ -1,0 +1,742 @@
+# Content Idea Generator - Report Generator Module Specification
+# OpenSpec-inspired format v1.0
+# Generated for: Content-Idea-Generator-Skill
+
+specification:
+  name: "Content Idea Generator - Report Generator"
+  module: "report_generator"
+  version: "1.0.0"
+  description: |
+    Automated report generation module for the Content Idea Generator skill.
+    Generates daily/weekly reports with statistics, content suggestions with 
+    confidence scores, and exports to chat-friendly formats and Obsidian markdown.
+  author: "Galatea"
+  parent_skill: "content-idea-generator"
+  
+  tdd_config:
+    test_framework: pytest
+    coverage_threshold: 80
+    test_types: [unit, integration]
+    auto_generate_tests: true
+
+# =============================================================================
+# FUNCTIONAL REQUIREMENTS
+# =============================================================================
+
+requirements:
+  functional:
+    - id: REP-001
+      priority: high
+      description: "Daily report generation with statistics"
+      acceptance_criteria:
+        - "Report includes count of new ideas captured in the last 24 hours"
+        - "Report shows breakdown by input type (text/voice/screenshot)"
+        - "Report displays top 5 most used tags"
+        - "Report includes trend comparison with previous day"
+      scenarios:
+        - name: "daily_report_generation"
+          given: "user has captured ideas in the last 24 hours"
+          when: "daily report is triggered at scheduled time"
+          then: "report is generated with accurate statistics"
+          
+        - name: "daily_report_empty_day"
+          given: "no ideas were captured in the last 24 hours"
+          when: "daily report is triggered"
+          then: "report shows 'No new ideas today' with encouragement message"
+
+    - id: REP-002
+      priority: high
+      description: "Chat-friendly output format for Discord/Telegram"
+      acceptance_criteria:
+        - "Output uses platform-appropriate formatting (Discord embeds, Telegram HTML)"
+        - "Message length respects platform limits (Discord: 2000 chars, Telegram: 4096)"
+        - "Uses emoji and visual separators for readability"
+        - "Supports interactive buttons/links where platform allows"
+      scenarios:
+        - name: "discord_format"
+          given: "report is generated for Discord platform"
+          when: "format_report is called with platform='discord'"
+          then: "output uses Discord markdown and respects 2000 char limit"
+          
+        - name: "telegram_format"
+          given: "report is generated for Telegram platform"
+          when: "format_report is called with platform='telegram'"
+          then: "output uses Telegram HTML parse mode and respects 4096 char limit"
+
+    - id: REP-003
+      priority: high
+      description: "Markdown export for Obsidian"
+      acceptance_criteria:
+        - "Generates valid Obsidian-compatible markdown"
+        - "Includes YAML frontmatter with metadata (date, tags, type)"
+        - "Supports wiki-style links for related ideas"
+        - "Creates daily notes in configured Obsidian vault path"
+      scenarios:
+        - name: "obsidian_daily_export"
+          given: "daily report is generated"
+          when: "export_to_obsidian is called"
+          then: "markdown file is created with proper frontmatter and content"
+          
+        - name: "obsidian_weekly_export"
+          given: "weekly summary is generated"
+          when: "export_to_obsidian is called with type='weekly'"
+          then: "weekly summary markdown is created with aggregated data"
+
+    - id: REP-004
+      priority: high
+      description: "Template-based rendering with Jinja2"
+      acceptance_criteria:
+        - "Supports customizable Jinja2 templates"
+        - "Provides default templates for daily, weekly, and suggestion reports"
+        - "Templates have access to all report data variables"
+        - "Supports template inheritance and macros"
+      scenarios:
+        - name: "default_template_rendering"
+          given: "report data is available"
+          when: "render_report is called without custom template"
+          then: "default template is used and rendered correctly"
+          
+        - name: "custom_template_rendering"
+          given: "user has created a custom template"
+          when: "render_report is called with custom template path"
+          then: "custom template is loaded and rendered with report data"
+          
+        - name: "template_variable_access"
+          given: "template includes variables like {{ stats.total_ideas }}"
+          when: "template is rendered"
+          then: "variables are replaced with actual report data"
+
+    - id: REP-005
+      priority: medium
+      description: "Content suggestions with confidence scores"
+      acceptance_criteria:
+        - "Analyzes idea clusters to identify content themes"
+        - "Generates 3-5 content suggestions per report"
+        - "Each suggestion includes confidence score (0-100%)"
+        - "Suggestions include related idea references"
+        - "Supports multiple suggestion types (series, article, thread, video)"
+      scenarios:
+        - name: "suggestion_generation"
+          given: "multiple related ideas exist in database"
+          when: "generate_suggestions is called"
+          then: "suggestions are generated with confidence scores"
+          
+        - name: "high_confidence_suggestion"
+          given: "strong thematic cluster exists (5+ related ideas)"
+          when: "suggestions are generated"
+          then: "suggestion has confidence score >= 80%"
+          
+        - name: "low_confidence_filtering"
+          given: "suggestion confidence is below 50%"
+          when: "report is generated"
+          then: "low confidence suggestions are excluded or marked as 'explore'"
+
+    - id: REP-006
+      priority: medium
+      description: "Weekly summary reports"
+      acceptance_criteria:
+        - "Aggregates 7 days of data into weekly summary"
+        - "Shows week-over-week growth metrics"
+        - "Highlights top performing content themes"
+        - "Includes personalized insights and recommendations"
+      scenarios:
+        - name: "weekly_summary_generation"
+          given: "7 days of idea data exists"
+          when: "weekly report is triggered"
+          then: "summary aggregates all data with trends and insights"
+          
+        - name: "weekly_comparison"
+          given: "previous week's data exists"
+          when: "weekly report is generated"
+          then: "report includes week-over-week percentage changes"
+
+  non_functional:
+    - id: REP-NF-001
+      category: performance
+      description: "Report generation completes within 3 seconds"
+      metric: "p95 latency < 3s for daily reports"
+      
+    - id: REP-NF-002
+      category: reliability
+      description: "Graceful handling of database errors"
+      acceptance_criteria:
+        - "Returns user-friendly error message on DB failure"
+        - "Logs detailed error for debugging"
+        - "Does not crash on partial data availability"
+        
+    - id: REP-NF-003
+      category: maintainability
+      description: "Template files are hot-reloadable"
+      acceptance_criteria:
+        - "Template changes take effect without restart"
+        - "Template syntax errors are caught and reported"
+        
+    - id: REP-NF-004
+      category: compatibility
+      description: "Supports Python 3.9+"
+      
+    - id: REP-NF-005
+      category: security
+      description: "Jinja2 templates run in sandboxed environment"
+      acceptance_criteria:
+        - "No access to system functions from templates"
+        - "User input is properly escaped in rendered output"
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+
+architecture:
+  
+  interfaces:
+    - name: ReportGenerator
+      type: class
+      description: "Main entry point for report generation"
+      methods:
+        - name: generate_daily_report
+          signature: "(date: Optional[datetime] = None) -> Report"
+          description: "Generate daily report for specified date (default: today)"
+          
+        - name: generate_weekly_report
+          signature: "(week_start: Optional[datetime] = None) -> Report"
+          description: "Generate weekly summary starting from specified date"
+          
+        - name: format_for_platform
+          signature: "(report: Report, platform: str) -> str"
+          description: "Format report for specific platform (discord, telegram, obsidian)"
+          
+        - name: export_to_obsidian
+          signature: "(report: Report, vault_path: str) -> Path"
+          description: "Export report as markdown to Obsidian vault"
+          
+        - name: generate_suggestions
+          signature: "(idea_clusters: List[Cluster]) -> List[Suggestion]"
+          description: "Generate content suggestions from idea clusters"
+
+    - name: Report
+      type: dataclass
+      description: "Report data structure"
+      fields:
+        - name: date
+          type: datetime
+          description: "Report date or week start date"
+        - name: type
+          type: str
+          description: "Report type: 'daily' or 'weekly'"
+        - name: stats
+          type: ReportStats
+          description: "Statistics object"
+        - name: suggestions
+          type: List[Suggestion]
+          description: "Generated content suggestions"
+        - name: insights
+          type: List[str]
+          description: "Personalized insights"
+
+    - name: ReportStats
+      type: dataclass
+      description: "Report statistics structure"
+      fields:
+        - name: total_ideas
+          type: int
+        - name: ideas_by_type
+          type: Dict[str, int]
+          description: "Breakdown: {'text': 5, 'voice': 3, 'screenshot': 2}"
+        - name: top_tags
+          type: List[Tuple[str, int]]
+          description: "Top 5 tags with counts"
+        - name: trend_vs_previous
+          type: float
+          description: "Percentage change vs previous period"
+
+    - name: Suggestion
+      type: dataclass
+      description: "Content suggestion structure"
+      fields:
+        - name: title
+          type: str
+        - name: type
+          type: str
+          description: "'series', 'article', 'thread', 'video'"
+        - name: confidence
+          type: float
+          description: "Confidence score 0.0-1.0"
+        - name: related_idea_ids
+          type: List[str]
+        - name: description
+          type: str
+
+    - name: TemplateEngine
+      type: class
+      description: "Jinja2 template rendering engine"
+      methods:
+        - name: render
+          signature: "(template_name: str, context: dict) -> str"
+        - name: load_template
+          signature: "(template_path: str) -> Template"
+        - name: register_filter
+          signature: "(name: str, func: Callable) -> None"
+
+  templates:
+    - name: daily_report
+      path: "templates/daily_report.j2"
+      description: "Default daily report template"
+      variables:
+        - report.date
+        - report.stats
+        - report.suggestions
+        - report.insights
+        
+    - name: weekly_report
+      path: "templates/weekly_report.j2"
+      description: "Weekly summary template"
+      variables:
+        - report.date
+        - report.stats
+        - report.suggestions
+        - report.insights
+        - report.weekly_highlights
+        
+    - name: discord_compact
+      path: "templates/discord_compact.j2"
+      description: "Discord-optimized compact format"
+      
+    - name: telegram_html
+      path: "templates/telegram_html.j2"
+      description: "Telegram HTML parse mode template"
+      
+    - name: obsidian_daily
+      path: "templates/obsidian_daily.j2"
+      description: "Obsidian daily note format with YAML frontmatter"
+      
+    - name: obsidian_weekly
+      path: "templates/obsidian_weekly.j2"
+      description: "Obsidian weekly summary format"
+
+  data_flow:
+    - step: "Fetch ideas from database (last 24h or 7 days)"
+      component: "DatabaseQuery"
+    - step: "Calculate statistics and trends"
+      component: "StatsCalculator"
+    - step: "Cluster ideas and generate suggestions"
+      component: "SuggestionEngine"
+    - step: "Render template with report data"
+      component: "TemplateEngine"
+    - step: "Format for target platform"
+      component: "PlatformFormatter"
+    - step: "Export to Obsidian (if requested)"
+      component: "ObsidianExporter"
+
+# =============================================================================
+# TEST STRATEGY
+# =============================================================================
+
+test_strategy:
+  unit_tests:
+    coverage_target: 85
+    focus_areas:
+      - "Report data structure validation"
+      - "Statistics calculation logic"
+      - "Template rendering with various inputs"
+      - "Platform-specific formatting"
+      - "Suggestion confidence scoring"
+    
+  integration_tests:
+    coverage_target: 75
+    focus_areas:
+      - "Database query integration"
+      - "Template engine with file system"
+      - "Obsidian export with actual file operations"
+      - "End-to-end report generation"
+      
+  test_data:
+    - "Mock idea database with 100+ sample ideas"
+    - "Various tag distributions for clustering tests"
+    - "Edge cases: empty database, single idea, all same tags"
+    
+  mocking_strategy:
+    - "Database connections mocked in unit tests"
+    - "File system operations mocked in unit tests"
+    - "Date/time frozen for deterministic tests"
+
+# =============================================================================
+# TEST CASES
+# =============================================================================
+
+test_cases:
+  - id: TC-001
+    name: "Daily report with multiple ideas"
+    type: integration
+    requirement: REP-001
+    description: |
+      Verify that daily report correctly aggregates statistics 
+      from ideas captured in the last 24 hours.
+    setup:
+      - "Seed database with 10 ideas from today (various types)"
+      - "Add 5 ideas from yesterday"
+    input:
+      report_date: "2026-03-02"
+    expected:
+      - "stats.total_ideas == 10"
+      - "stats.ideas_by_type contains correct breakdown"
+      - "stats.trend_vs_previous == 100.0 (doubled from 5)"
+    
+  - id: TC-002
+    name: "Discord format respects character limit"
+    type: unit
+    requirement: REP-002
+    description: |
+      Ensure Discord-formatted reports are split or truncated 
+      to respect Discord's 2000 character limit.
+    setup:
+      - "Create report with many suggestions (long content)"
+    input:
+      platform: "discord"
+    expected:
+      - "len(formatted_output) <= 2000"
+      - "Output contains essential sections (stats, top suggestions)"
+      - "Message ends with '...' or pagination indicator if truncated"
+      
+  - id: TC-003
+    name: "Obsidian export creates valid markdown"
+    type: integration
+    requirement: REP-003
+    description: |
+      Verify Obsidian export creates properly formatted markdown 
+      with YAML frontmatter and wiki links.
+    setup:
+      - "Create temporary directory as mock vault"
+      - "Generate report with 3 ideas having related tags"
+    input:
+      vault_path: "/tmp/test_vault"
+    expected:
+      - "File created at /tmp/test_vault/Daily Notes/2026-03-02.md"
+      - "File contains YAML frontmatter with date and tags"
+      - "File contains wiki links to related ideas"
+      - "Markdown is valid (parses without errors)"
+      
+  - id: TC-004
+    name: "Custom Jinja2 template rendering"
+    type: unit
+    requirement: REP-004
+    description: |
+      Test that custom templates can be loaded and rendered 
+      with full access to report data variables.
+    setup:
+      - "Create custom template with all variable types"
+    input:
+      template_content: |
+        # {{ report.type }} Report
+        Ideas: {{ report.stats.total_ideas }}
+        {% for tag, count in report.stats.top_tags %}
+        - {{ tag }}: {{ count }}
+        {% endfor %}
+    expected:
+      - "Rendered output contains 'daily Report'"
+      - "Rendered output contains 'Ideas: 10'"
+      - "Rendered output contains all tags with counts"
+      
+  - id: TC-005
+    name: "Content suggestion confidence calculation"
+    type: unit
+    requirement: REP-005
+    description: |
+      Verify that content suggestions are generated with 
+      appropriate confidence scores based on cluster strength.
+    setup:
+      - "Create mock clusters: strong (8 ideas), weak (2 ideas)"
+    input:
+      clusters: [
+        {id: "python-tips", ideas: ["idea1", "idea2", ... 8 items], theme: "Python"},
+        {id: "random", ideas: ["idea9", "idea10"], theme: "Misc"}
+      ]
+    expected:
+      - "Suggestion for 'python-tips' has confidence >= 0.8"
+      - "Suggestion for 'random' has confidence < 0.5 or is filtered"
+      - "Each suggestion includes related_idea_ids"
+      
+  - id: TC-006
+    name: "Weekly summary aggregation"
+    type: integration
+    requirement: REP-006
+    description: |
+      Test weekly summary correctly aggregates 7 days of data
+      and calculates week-over-week trends.
+    setup:
+      - "Seed 14 days of data (current week + previous week)"
+      - "Current week: 35 ideas, Previous week: 28 ideas"
+    input:
+      week_start: "2026-02-24"
+    expected:
+      - "stats.total_ideas == 35"
+      - "stats.trend_vs_previous == 25.0 (+25% growth)"
+      - "Report includes highlights from all 7 days"
+      
+  - id: TC-007
+    name: "Empty database graceful handling"
+    type: unit
+    requirement: [REP-001, REP-NF-002]
+    description: |
+      Ensure report generation handles empty database gracefully
+      with encouraging message instead of error.
+    setup:
+      - "Clear all ideas from database"
+    input:
+      report_date: "2026-03-02"
+    expected:
+      - "stats.total_ideas == 0"
+      - "Report contains 'No new ideas today' message"
+      - "Report contains encouragement/tip for capturing ideas"
+      - "No exceptions raised"
+      
+  - id: TC-008
+    name: "Template sandbox security"
+    type: unit
+    requirement: REP-NF-005
+    description: |
+      Verify Jinja2 templates run in sandboxed environment
+      and cannot access system functions.
+    setup:
+      - "Create malicious template attempting system access"
+    input:
+      template_content: "{{ __import__('os').system('ls') }}"
+    expected:
+      - "SecurityError or TemplateError raised"
+      - "No system command executed"
+      - "Error message is user-friendly"
+
+# =============================================================================
+# EXAMPLE OUTPUT FORMATS
+# =============================================================================
+
+example_outputs:
+  
+  discord_daily:
+    description: "Discord chat-friendly daily report"
+    content: |
+      📊 **Daily Inspiration Report** — March 2, 2026
+
+      📈 **Stats:**
+      • 12 new ideas today ⬆️ +50% vs yesterday
+      • 7 from text, 3 from voice, 2 from screenshots
+      • Top tag: #python (5 ideas)
+
+      💡 **Top Suggestions:**
+      🟢 **Python Tips Series** (confidence: 92%)
+      Create a weekly Python tips series based on your 5 #python ideas
+      Related: idea-001, idea-004, idea-007, idea-009, idea-011
+
+      🟡 **DevOps Automation Guide** (confidence: 78%)
+      Your Docker and CI/CD ideas could become a comprehensive guide
+      Related: idea-003, idea-008, idea-012
+
+      📝 **Quick Drafts:**
+      [Twitter] 🐍 5 Python one-liners that will save you hours →
+      [LinkedIn] From voice memo to blog post: my content workflow
+
+      💬 Tip: Use `/voice` to capture ideas on the go!
+
+  telegram_daily:
+    description: "Telegram HTML formatted report"
+    content: |
+      <b>📊 Daily Inspiration Report</b> — March 2, 2026
+
+      <b>📈 Stats:</b>
+      • 12 new ideas today ⬆️ <b>+50%</b> vs yesterday
+      • 7 from text, 3 from voice, 2 from screenshots
+      • Top tag: #python (5 ideas)
+
+      <b>💡 Top Suggestions:</b>
+      🟢 <b>Python Tips Series</b> (confidence: 92%)
+      Create a weekly Python tips series based on your 5 #python ideas
+
+      <a href="obsidian://open?vault=Content%20Ideas&file=2026-03-02">📓 Open in Obsidian</a>
+
+  obsidian_daily:
+    description: "Obsidian daily note format"
+    content: |
+      ---
+      date: 2026-03-02
+      type: daily-report
+      tags: [content-ideas, daily-report, python]
+      total_ideas: 12
+      ---
+
+      # Daily Inspiration Report — March 2, 2026
+
+      ## 📈 Statistics
+
+      | Metric | Value | Trend |
+      |--------|-------|-------|
+      | Total Ideas | 12 | ⬆️ +50% |
+      | Text | 7 | - |
+      | Voice | 3 | - |
+      | Screenshots | 2 | - |
+
+      ### Top Tags
+      - #python (5)
+      - #devops (3)
+      - #tutorial (2)
+
+      ## 💡 Content Suggestions
+
+      ### 🟢 Python Tips Series (92% confidence)
+      Create a weekly Python tips series based on your 5 #python ideas
+
+      **Related Ideas:**
+      - [[idea-001|Python decorators tutorial]]
+      - [[idea-004|List comprehensions guide]]
+      - [[idea-007|Context managers explained]]
+      - [[idea-009|Lambda functions deep dive]]
+      - [[idea-011|Type hints best practices]]
+
+      ### 🟡 DevOps Automation Guide (78% confidence)
+      Your Docker and CI/CD ideas could become a comprehensive guide
+
+      **Related Ideas:**
+      - [[idea-003|Docker multi-stage builds]]
+      - [[idea-008|GitHub Actions workflows]]
+      - [[idea-012|Container security checklist]]
+
+      ## 📝 Quick Drafts
+
+      - [Twitter] 🐍 5 Python one-liners that will save you hours
+      - [LinkedIn] From voice memo to blog post: my content workflow
+
+      ---
+      *Generated by Content Idea Generator*
+
+  weekly_summary:
+    description: "Weekly summary report format"
+    content: |
+      📊 **Weekly Inspiration Summary** — Feb 24 - Mar 2, 2026
+
+      ## Week at a Glance
+
+      📈 **35 ideas** captured this week ⬆️ +25% vs last week
+      🎯 **Most productive day:** Thursday (8 ideas)
+      🏷️ **Top theme:** Python tutorials
+
+      ## Input Breakdown
+
+      ```
+      Text:       ████████████ 20 (57%)
+      Voice:      ██████ 10 (29%)
+      Screenshot: ██ 5 (14%)
+      ```
+
+      ## Top Content Themes
+
+      1. **#python** — 12 ideas
+         Trend: Growing interest in advanced topics
+         Suggestion: Create "Python Mastery" series
+
+      2. **#devops** — 8 ideas  
+         Trend: Docker and CI/CD focus
+         Suggestion: Write "DevOps for Developers" guide
+
+      3. **#career** — 5 ideas
+         Trend: Soft skills and growth
+         Suggestion: Thread on developer career paths
+
+      ## 💡 High-Confidence Suggestions
+
+      🟢 **Python Tips Series** (92% confidence)
+      Weekly bite-sized Python tips based on 12 related ideas
+
+      🟢 **Docker Deep Dive** (85% confidence)  
+      Comprehensive Docker guide from your containerization ideas
+
+      🟡 **Developer Productivity** (72% confidence)
+      Combine your workflow and tooling ideas
+
+      ## 📅 Next Week Focus
+
+      Based on your patterns, consider exploring:
+      - Type hints and static analysis
+      - Testing best practices
+      - Open source contribution guides
+
+      ---
+      Keep capturing those ideas! 💡
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+dependencies:
+  required:
+    - name: jinja2
+      version: ">=3.0"
+      purpose: "Template engine for report rendering"
+    - name: python-dateutil
+      version: ">=2.8"
+      purpose: "Date parsing and manipulation"
+      
+  optional:
+    - name: pyyaml
+      version: ">=6.0"
+      purpose: "YAML frontmatter generation for Obsidian"
+    - name: emoji
+      version: ">=2.0"
+      purpose: "Cross-platform emoji support"
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+configuration:
+  options:
+    - name: report.schedule
+      type: string
+      default: "daily"
+      options: ["daily", "weekly", "both"]
+      description: "Report generation frequency"
+      
+    - name: report.time
+      type: string
+      default: "09:00"
+      description: "Time of day to generate reports (24h format)"
+      
+    - name: report.platforms
+      type: list
+      default: ["discord"]
+      options: ["discord", "telegram", "obsidian"]
+      description: "Platforms to send reports to"
+      
+    - name: obsidian.export_path
+      type: path
+      default: "~/Obsidian/Content Ideas"
+      description: "Path to Obsidian vault for markdown export"
+      
+    - name: templates.custom_path
+      type: path
+      default: null
+      description: "Path to custom Jinja2 templates directory"
+      
+    - name: suggestions.min_confidence
+      type: float
+      default: 0.5
+      range: [0.0, 1.0]
+      description: "Minimum confidence threshold for suggestions"
+      
+    - name: suggestions.max_count
+      type: int
+      default: 5
+      range: [1, 10]
+      description: "Maximum number of suggestions per report"
+
+# =============================================================================
+# CHANGELOG
+# =============================================================================
+
+changelog:
+  - version: "1.0.0"
+    date: "2026-03-02"
+    changes:
+      - "Initial specification for Report Generator module"
+      - "Support for daily and weekly reports"
+      - "Discord and Telegram chat-friendly formats"
+      - "Obsidian markdown export"
+      - "Jinja2 template-based rendering"
+      - "Content suggestions with confidence scores"

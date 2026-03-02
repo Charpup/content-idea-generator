@@ -1,0 +1,983 @@
+# Content Idea Generator - Database Module Specification
+# OpenSpec-inspired format for TDD+SDD workflow
+# Version: 1.0.0
+
+specification:
+  name: "Content Idea Generator Database Module"
+  version: "1.0.0"
+  description: |
+    SQLite-based storage layer with FTS5 full-text search for the Content Idea Generator skill.
+    Provides persistent storage for ideas, tags, categories, and content items with hierarchical
+    categorization and advanced search capabilities.
+  author: "Galatea"
+  created_date: "2026-03-02"
+  
+tdd_config:
+  test_framework: pytest
+  coverage_threshold: 80
+  test_types: [unit, integration]
+  mock_strategy: sqlite_in_memory
+  
+requirements:
+  # ==================== FUNCTIONAL REQUIREMENTS ====================
+  
+  - id: DB-001
+    category: functional
+    priority: critical
+    description: "SQLite database initialization with schema creation"
+    acceptance_criteria:
+      - "Database file is created at configured path if not exists"
+      - "All required tables are created on first run"
+      - "FTS5 virtual table is properly initialized"
+      - "Schema version is tracked for migrations"
+    scenarios:
+      - name: "fresh_database_initialization"
+        given: "no existing database file"
+        when: "DatabaseManager is initialized"
+        then: "database file is created with all tables and indexes"
+        
+      - name: "existing_database_connection"
+        given: "valid existing database file"
+        when: "DatabaseManager is initialized"
+        then: "connection is established without data loss"
+
+  - id: DB-002
+    category: functional
+    priority: critical
+    description: "Idea entity CRUD operations"
+    acceptance_criteria:
+      - "Create: Ideas can be saved with title, content, source, and timestamps"
+      - "Read: Ideas can be retrieved by ID or filtered by various criteria"
+      - "Update: Idea fields can be modified while preserving ID and created_at"
+      - "Delete: Ideas can be soft-deleted (archived) or hard-deleted"
+      - "List: Ideas can be paginated and sorted by date, title, or relevance"
+    scenarios:
+      - name: "create_idea_with_tags"
+        given: "valid idea data with title and content"
+        when: "create_idea() is called with tag list"
+        then: "idea is saved and associated tags are created/linked"
+        
+      - name: "update_idea_preserves_relations"
+        given: "existing idea with tags and category"
+        when: "update_idea() modifies content"
+        then: "tags and category associations remain intact"
+        
+      - name: "soft_delete_idea"
+        given: "existing idea"
+        when: "delete_idea(soft=True) is called"
+        then: "idea is marked as archived but remains in database"
+        
+      - name: "hard_delete_idea"
+        given: "existing idea"
+        when: "delete_idea(soft=False) is called"
+        then: "idea and its tag associations are permanently removed"
+
+  - id: DB-003
+    category: functional
+    priority: high
+    description: "Tag entity CRUD and management"
+    acceptance_criteria:
+      - "Tags can be created with unique names (case-insensitive)"
+      - "Tags can be retrieved by ID or name"
+      - "Tags can be updated (renamed) with cascade to associations"
+      - "Tags can be deleted only if no ideas reference them"
+      - "Auto-creation: Non-existent tags are created on idea save"
+    scenarios:
+      - name: "create_tag_normalized"
+        given: "tag name 'Python'"
+        when: "tag is created"
+        then: "name is normalized to lowercase 'python' for storage"
+        
+      - name: "prevent_duplicate_tags"
+        given: "existing tag 'python'"
+        when: "attempting to create tag 'Python'"
+        then: "existing tag is returned, no duplicate created"
+        
+      - name: "delete_tag_with_references_blocked"
+        given: "tag associated with 2 ideas"
+        when: "delete_tag() is called"
+        then: "deletion is rejected with ReferenceExistsError"
+        
+      - name: "get_or_create_tags_batch"
+        given: "list of tag names including existing and new"
+        when: "get_or_create_tags() is called"
+        then: "returns tag IDs, creating new ones as needed"
+
+  - id: DB-004
+    category: functional
+    priority: high
+    description: "Category hierarchy support"
+    acceptance_criteria:
+      - "Categories can be created with optional parent category"
+      - "Hierarchical queries: Get all children/descendants of a category"
+      - "Path computation: Full path from root to category can be retrieved"
+      - "Cycle prevention: Parent cannot be set to self or descendant"
+      - "Root categories: Categories with null parent are top-level"
+    scenarios:
+      - name: "create_nested_category"
+        given: "existing category 'Technology'"
+        when: "creating category 'Programming' with parent 'Technology'"
+        then: "category is created with correct parent_id"
+        
+      - name: "get_category_descendants"
+        given: "category tree: Tech → Programming → Python"
+        when: "get_descendants('Tech') is called"
+        then: "returns Programming and Python categories"
+        
+      - name: "prevent_circular_reference"
+        given: "category A with parent B, B with parent C"
+        when: "attempting to set C's parent to A"
+        then: "operation fails with CircularReferenceError"
+        
+      - name: "get_category_path"
+        given: "deeply nested category"
+        when: "get_path() is called"
+        then: "returns ordered list from root to target category"
+
+  - id: DB-005
+    category: functional
+    priority: critical
+    description: "Content items storage for multi-input capture"
+    acceptance_criteria:
+      - "Content items store raw input (text, transcription, OCR text)"
+      - "Content items link to parent ideas (one-to-many)"
+      - "Content metadata includes source type, timestamp, and file references"
+      - "Content can be retrieved with its associated idea"
+      - "Bulk operations: Multiple content items can be created in batch"
+    scenarios:
+      - name: "create_voice_content_item"
+        given: "voice transcription 'Python tips' and audio file path"
+        when: "create_content_item() is called with type='voice'"
+        then: "content item is saved with transcription and metadata"
+        
+      - name: "create_screenshot_content_item"
+        given: "OCR-extracted text from image"
+        when: "create_content_item() is called with type='screenshot'"
+        then: "content item is saved with extracted text and image path"
+        
+      - name: "get_idea_with_content"
+        given: "idea with 3 associated content items"
+        when: "get_idea(include_content=True) is called"
+        then: "idea object includes list of content items"
+
+  - id: DB-006
+    category: functional
+    priority: critical
+    description: "FTS5 full-text search across content"
+    acceptance_criteria:
+      - "Search covers idea titles, content, and content item text"
+      - "Search supports phrase matching with quotes"
+      - "Search supports prefix matching with wildcard *"
+      - "Search results are ranked by relevance"
+      - "Search can be filtered by tags, categories, and date ranges"
+    scenarios:
+      - name: "basic_fulltext_search"
+        given: "ideas containing 'python decorator'"
+        when: "search('python decorator') is called"
+        then: "returns matching ideas ordered by relevance"
+        
+      - name: "phrase_search"
+        given: "ideas with 'machine learning' and 'learning machine'"
+        when: "search('\"machine learning\"') is called"
+        then: "only returns ideas with exact phrase 'machine learning'"
+        
+      - name: "prefix_search"
+        given: "ideas with 'documentation', 'document', 'docstring'"
+        when: "search('doc*') is called"
+        then: "returns all ideas with words starting with 'doc'"
+        
+      - name: "filtered_search"
+        given: "ideas with tag 'python' and ideas with tag 'javascript'"
+        when: "search('tutorial', tags=['python']) is called"
+        then: "only returns python-tagged ideas matching 'tutorial'"
+
+  - id: DB-007
+    category: functional
+    priority: high
+    description: "Tag-based filtering and aggregation"
+    acceptance_criteria:
+      - "Ideas can be filtered by single or multiple tags (AND/OR logic)"
+      - "Tag statistics: Count of ideas per tag"
+      - "Related tags: Find tags that frequently co-occur"
+      - "Tag suggestions: Suggest tags based on content similarity"
+    scenarios:
+      - name: "filter_by_multiple_tags_and"
+        given: "ideas tagged with various combinations"
+        when: "get_ideas_by_tags(['python', 'advanced'], match_all=True)"
+        then: "only returns ideas with BOTH tags"
+        
+      - name: "filter_by_multiple_tags_or"
+        given: "ideas tagged with various combinations"
+        when: "get_ideas_by_tags(['python', 'javascript'], match_all=False)"
+        then: "returns ideas with EITHER tag"
+        
+      - name: "get_tag_statistics"
+        given: "10 ideas with various tag distributions"
+        when: "get_tag_stats() is called"
+        then: "returns count of ideas per tag, sorted by frequency"
+
+  - id: DB-008
+    category: functional
+    priority: medium
+    description: "Transaction support and data integrity"
+    acceptance_criteria:
+      - "Multi-table operations are wrapped in transactions"
+      - "Failed operations roll back to maintain consistency"
+      - "Foreign key constraints are enforced"
+      - "Concurrent access is handled safely"
+    scenarios:
+      - name: "transaction_rollback_on_error"
+        given: "idea creation with invalid tag data"
+        when: "create_idea() fails mid-operation"
+        then: "no partial data remains in database"
+        
+      - name: "foreign_key_constraint"
+        given: "attempt to create idea with non-existent category_id"
+        when: "insert is executed"
+        then: "ForeignKeyConstraintError is raised"
+
+  # ==================== NON-FUNCTIONAL REQUIREMENTS ====================
+
+  - id: DB-NF-001
+    category: non-functional
+    priority: high
+    description: "Performance: Query response time"
+    acceptance_criteria:
+      - "Simple queries (by ID) complete in < 10ms"
+      - "Full-text search completes in < 100ms for 10k records"
+      - "List queries with pagination complete in < 50ms"
+      - "Bulk insert of 100 records completes in < 500ms"
+
+  - id: DB-NF-002
+    category: non-functional
+    priority: high
+    description: "Data durability and corruption resistance"
+    acceptance_criteria:
+      - "WAL (Write-Ahead Logging) mode is enabled"
+      - "Synchronous mode is set to NORMAL for balance"
+      - "Database can be backed up while in use"
+      - "Corrupted database files are detected on open"
+
+  - id: DB-NF-003
+    category: non-functional
+    priority: medium
+    description: "Schema migration support"
+    acceptance_criteria:
+      - "Schema version is stored in database"
+      - "Migration scripts can be applied incrementally"
+      - "Backward compatibility is maintained for one major version"
+
+  - id: DB-NF-004
+    category: non-functional
+    priority: medium
+    description: "Testability"
+    acceptance_criteria:
+      - "In-memory database can be used for tests"
+      - "Database state can be reset between tests"
+      - "Test fixtures can be loaded from JSON/SQL"
+
+architecture:
+  # ==================== INTERFACES ====================
+  
+  interfaces:
+    - name: DatabaseManager
+      type: class
+      description: "Main entry point for all database operations"
+      methods:
+        - signature: "__init__(db_path: str, init_schema: bool = True)"
+          description: "Initialize database connection and optionally create schema"
+          
+        - signature: "close() -> None"
+          description: "Close database connection and cleanup resources"
+          
+        - signature: "execute_migration(target_version: int) -> bool"
+          description: "Apply migration scripts to reach target schema version"
+
+    - name: IdeaRepository
+      type: class
+      description: "Repository for Idea entity operations"
+      methods:
+        - signature: "create(idea: IdeaCreate) -> Idea"
+          description: "Create new idea with optional tags and category"
+          
+        - signature: "get_by_id(idea_id: int, include_content: bool = False) -> Optional[Idea]"
+          description: "Retrieve idea by ID, optionally with content items"
+          
+        - signature: "update(idea_id: int, data: IdeaUpdate) -> Idea"
+          description: "Update idea fields, preserving immutable data"
+          
+        - signature: "delete(idea_id: int, soft: bool = True) -> bool"
+          description: "Delete idea (soft or hard delete)"
+          
+        - signature: "list(filters: IdeaFilters, pagination: Pagination) -> PaginatedResult[Idea]"
+          description: "List ideas with filtering and pagination"
+          
+        - signature: "search(query: str, filters: SearchFilters) -> List[SearchResult]"
+          description: "Full-text search across ideas and content"
+
+    - name: TagRepository
+      type: class
+      description: "Repository for Tag entity operations"
+      methods:
+        - signature: "create(name: str) -> Tag"
+          description: "Create new tag with normalized name"
+          
+        - signature: "get_by_id(tag_id: int) -> Optional[Tag]"
+          description: "Retrieve tag by ID"
+          
+        - signature: "get_by_name(name: str) -> Optional[Tag]"
+          description: "Retrieve tag by name (case-insensitive)"
+          
+        - signature: "get_or_create(names: List[str]) -> List[Tag]"
+          description: "Get existing tags or create new ones"
+          
+        - signature: "update(tag_id: int, new_name: str) -> Tag"
+          description: "Rename tag, updating all associations"
+          
+        - signature: "delete(tag_id: int, force: bool = False) -> bool"
+          description: "Delete tag if no references exist"
+          
+        - signature: "get_stats() -> List[TagStats]"
+          description: "Get usage statistics for all tags"
+
+    - name: CategoryRepository
+      type: class
+      description: "Repository for Category entity operations with hierarchy support"
+      methods:
+        - signature: "create(name: str, parent_id: Optional[int] = None, description: Optional[str] = None) -> Category"
+          description: "Create category with optional parent"
+          
+        - signature: "get_by_id(category_id: int) -> Optional[Category]"
+          description: "Retrieve category by ID"
+          
+        - signature: "get_tree(root_id: Optional[int] = None) -> CategoryTree"
+          description: "Get category tree starting from root or all roots"
+          
+        - signature: "get_descendants(category_id: int, include_self: bool = False) -> List[Category]"
+          description: "Get all descendants of a category"
+          
+        - signature: "get_path(category_id: int) -> List[Category]"
+          description: "Get path from root to category"
+          
+        - signature: "update(category_id: int, data: CategoryUpdate) -> Category"
+          description: "Update category, validating no cycles"
+          
+        - signature: "delete(category_id: int, reassign_to: Optional[int] = None) -> bool"
+          description: "Delete category, optionally reassigning ideas"
+
+    - name: ContentItemRepository
+      type: class
+      description: "Repository for ContentItem entity operations"
+      methods:
+        - signature: "create(item: ContentItemCreate) -> ContentItem"
+          description: "Create content item linked to idea"
+          
+        - signature: "create_batch(items: List[ContentItemCreate]) -> List[ContentItem]"
+          description: "Batch create content items in transaction"
+          
+        - signature: "get_by_idea(idea_id: int) -> List[ContentItem]"
+          description: "Get all content items for an idea"
+          
+        - signature: "update(item_id: int, data: ContentItemUpdate) -> ContentItem"
+          description: "Update content item"
+          
+        - signature: "delete(item_id: int) -> bool"
+          description: "Delete content item"
+
+  # ==================== DATA MODELS ====================
+  
+  data_models:
+    - name: Idea
+      table: ideas
+      description: "Core entity representing a content idea"
+      fields:
+        - name: id
+          type: INTEGER PRIMARY KEY AUTOINCREMENT
+          nullable: false
+          description: "Unique identifier"
+        - name: title
+          type: VARCHAR(255)
+          nullable: false
+          description: "Idea title"
+        - name: content
+          type: TEXT
+          nullable: true
+          description: "Main content/description"
+        - name: source
+          type: VARCHAR(50)
+          nullable: true
+          description: "Source of idea (text/voice/screenshot)"
+        - name: category_id
+          type: INTEGER
+          nullable: true
+          foreign_key: categories.id
+          description: "Optional category assignment"
+        - name: status
+          type: VARCHAR(20)
+          default: "active"
+          description: "active/archived/deleted"
+        - name: priority
+          type: INTEGER
+          default: 0
+          description: "Priority score (0-10)"
+        - name: created_at
+          type: DATETIME
+          default: "CURRENT_TIMESTAMP"
+          description: "Creation timestamp"
+        - name: updated_at
+          type: DATETIME
+          default: "CURRENT_TIMESTAMP"
+          description: "Last update timestamp"
+
+    - name: Tag
+      table: tags
+      description: "Label for categorizing ideas"
+      fields:
+        - name: id
+          type: INTEGER PRIMARY KEY AUTOINCREMENT
+          nullable: false
+        - name: name
+          type: VARCHAR(50)
+          nullable: false
+          unique: true
+          description: "Normalized tag name (lowercase)"
+        - name: display_name
+          type: VARCHAR(50)
+          nullable: false
+          description: "Original display name"
+        - name: color
+          type: VARCHAR(7)
+          nullable: true
+          description: "Optional hex color code"
+        - name: created_at
+          type: DATETIME
+          default: "CURRENT_TIMESTAMP"
+
+    - name: IdeaTag
+      table: idea_tags
+      description: "Many-to-many junction table for ideas and tags"
+      fields:
+        - name: idea_id
+          type: INTEGER
+          nullable: false
+          foreign_key: ideas.id
+          on_delete: CASCADE
+        - name: tag_id
+          type: INTEGER
+          nullable: false
+          foreign_key: tags.id
+          on_delete: CASCADE
+      constraints:
+        - "PRIMARY KEY (idea_id, tag_id)"
+
+    - name: Category
+      table: categories
+      description: "Hierarchical category for organizing ideas"
+      fields:
+        - name: id
+          type: INTEGER PRIMARY KEY AUTOINCREMENT
+          nullable: false
+        - name: name
+          type: VARCHAR(100)
+          nullable: false
+          unique: true
+        - name: description
+          type: TEXT
+          nullable: true
+        - name: parent_id
+          type: INTEGER
+          nullable: true
+          foreign_key: categories.id
+          on_delete: SET NULL
+          description: "Parent category for hierarchy"
+        - name: path
+          type: VARCHAR(500)
+          nullable: true
+          description: "Materialized path for fast queries (e.g., /1/2/3/)"
+        - name: level
+          type: INTEGER
+          default: 0
+          description: "Depth in hierarchy (0 = root)"
+        - name: created_at
+          type: DATETIME
+          default: "CURRENT_TIMESTAMP"
+
+    - name: ContentItem
+      table: content_items
+      description: "Raw input data (text, voice transcription, OCR)"
+      fields:
+        - name: id
+          type: INTEGER PRIMARY KEY AUTOINCREMENT
+          nullable: false
+        - name: idea_id
+          type: INTEGER
+          nullable: false
+          foreign_key: ideas.id
+          on_delete: CASCADE
+        - name: content_type
+          type: VARCHAR(20)
+          nullable: false
+          description: "text/voice/screenshot"
+        - name: content_text
+          type: TEXT
+          nullable: true
+          description: "Extracted/transcribed text content"
+        - name: source_path
+          type: VARCHAR(500)
+          nullable: true
+          description: "Path to original file (audio/image)"
+        - name: metadata
+          type: JSON
+          nullable: true
+          description: "Additional metadata (duration, dimensions, etc.)"
+        - name: created_at
+          type: DATETIME
+          default: "CURRENT_TIMESTAMP"
+
+    - name: ContentFTS
+      table: content_fts
+      type: virtual
+      using: FTS5
+      description: "FTS5 virtual table for full-text search"
+      fields:
+        - name: content_text
+          type: TEXT
+          description: "Text content for indexing"
+      content_table: content_items
+      content_rowid: id
+
+  # ==================== INDEXES ====================
+  
+  indexes:
+    - table: ideas
+      name: idx_ideas_category
+      columns: [category_id]
+      
+    - table: ideas
+      name: idx_ideas_status
+      columns: [status]
+      
+    - table: ideas
+      name: idx_ideas_created
+      columns: [created_at]
+      
+    - table: ideas
+      name: idx_ideas_updated
+      columns: [updated_at]
+      
+    - table: tags
+      name: idx_tags_name
+      columns: [name]
+      unique: true
+      
+    - table: categories
+      name: idx_categories_parent
+      columns: [parent_id]
+      
+    - table: categories
+      name: idx_categories_path
+      columns: [path]
+      
+    - table: content_items
+      name: idx_content_idea
+      columns: [idea_id]
+      
+    - table: content_items
+      name: idx_content_type
+      columns: [content_type]
+      
+    - table: idea_tags
+      name: idx_ideatag_tag
+      columns: [tag_id]
+
+  # ==================== SCHEMA SQL ====================
+  
+  schema_sql: |
+    -- Enable foreign keys
+    PRAGMA foreign_keys = ON;
+    
+    -- Schema version tracking
+    CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Categories (create first due to self-reference)
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        parent_id INTEGER,
+        path VARCHAR(500),
+        level INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
+    );
+    
+    -- Ideas
+    CREATE TABLE IF NOT EXISTS ideas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title VARCHAR(255) NOT NULL,
+        content TEXT,
+        source VARCHAR(50),
+        category_id INTEGER,
+        status VARCHAR(20) DEFAULT 'active',
+        priority INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+    );
+    
+    -- Tags
+    CREATE TABLE IF NOT EXISTS tags (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name VARCHAR(50) NOT NULL UNIQUE,
+        display_name VARCHAR(50) NOT NULL,
+        color VARCHAR(7),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Idea-Tag junction
+    CREATE TABLE IF NOT EXISTS idea_tags (
+        idea_id INTEGER NOT NULL,
+        tag_id INTEGER NOT NULL,
+        PRIMARY KEY (idea_id, tag_id),
+        FOREIGN KEY (idea_id) REFERENCES ideas(id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    );
+    
+    -- Content Items
+    CREATE TABLE IF NOT EXISTS content_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        idea_id INTEGER NOT NULL,
+        content_type VARCHAR(20) NOT NULL,
+        content_text TEXT,
+        source_path VARCHAR(500),
+        metadata JSON,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idea_id) REFERENCES ideas(id) ON DELETE CASCADE
+    );
+    
+    -- FTS5 Virtual Table
+    CREATE VIRTUAL TABLE IF NOT EXISTS content_fts USING fts5(
+        content_text,
+        content='content_items',
+        content_rowid='id'
+    );
+    
+    -- FTS5 Triggers for auto-sync
+    CREATE TRIGGER IF NOT EXISTS content_items_ai AFTER INSERT ON content_items BEGIN
+        INSERT INTO content_fts(rowid, content_text) VALUES (new.id, new.content_text);
+    END;
+    
+    CREATE TRIGGER IF NOT EXISTS content_items_ad AFTER DELETE ON content_items BEGIN
+        INSERT INTO content_fts(content_fts, rowid, content_text) VALUES ('delete', old.id, old.content_text);
+    END;
+    
+    CREATE TRIGGER IF NOT EXISTS content_items_au AFTER UPDATE ON content_items BEGIN
+        INSERT INTO content_fts(content_fts, rowid, content_text) VALUES ('delete', old.id, old.content_text);
+        INSERT INTO content_fts(rowid, content_text) VALUES (new.id, new.content_text);
+    END;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_ideas_category ON ideas(category_id);
+    CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
+    CREATE INDEX IF NOT EXISTS idx_ideas_created ON ideas(created_at);
+    CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_categories_path ON categories(path);
+    CREATE INDEX IF NOT EXISTS idx_content_idea ON content_items(idea_id);
+    CREATE INDEX IF NOT EXISTS idx_ideatag_tag ON idea_tags(tag_id);
+
+test_strategy:
+  # ==================== TEST STRATEGY ====================
+  
+  overview: |
+    Comprehensive test strategy using pytest with in-memory SQLite database.
+    Tests are organized into unit tests (repository methods in isolation) and
+    integration tests (multi-repository workflows and transactions).
+    
+  test_types:
+    - type: unit
+      description: "Test individual repository methods in isolation"
+      scope: "Single method, mocked or isolated dependencies"
+      database: "In-memory SQLite (:memory:)"
+      fixtures: "Fresh database per test class"
+      coverage_target: 85
+      
+    - type: integration
+      description: "Test multi-repository workflows and transactions"
+      scope: "Cross-repository operations, FTS search, hierarchy queries"
+      database: "In-memory SQLite (:memory:)"
+      fixtures: "Pre-populated test data"
+      coverage_target: 75
+      
+    - type: performance
+      description: "Benchmark queries with large datasets"
+      scope: "Search performance, pagination, bulk operations"
+      database: "File-based SQLite with generated data"
+      fixtures: "10k+ records for stress testing"
+      coverage_target: N/A
+
+  coverage:
+    overall_target: 80
+    by_module:
+      - module: repositories
+        target: 85
+      - module: models
+        target: 90
+      - module: database_manager
+        target: 80
+      - module: search
+        target: 75
+        
+  test_fixtures:
+    - name: empty_db
+      description: "Fresh database with schema only"
+      scope: function
+      
+    - name: sample_categories
+      description: "Category hierarchy: Tech → Programming → Python/JavaScript"
+      scope: class
+      
+    - name: sample_tags
+      description: "Common tags: python, javascript, tutorial, advanced, beginner"
+      scope: class
+      
+    - name: sample_ideas
+      description: "10 ideas with various tags and categories"
+      scope: class
+      
+    - name: sample_content
+      description: "Content items (text, voice, screenshot) linked to ideas"
+      scope: class
+
+test_cases:
+  # ==================== DETAILED TEST CASES ====================
+  
+  - id: TC-001
+    requirement_id: DB-001
+    name: "Database initialization creates all tables and indexes"
+    type: unit
+    priority: critical
+    setup: |
+      1. Create temporary directory
+      2. Define database path in temp directory
+    steps:
+      - "Initialize DatabaseManager with init_schema=True"
+      - "Query sqlite_master for all tables"
+      - "Query sqlite_master for all indexes"
+    expected_results:
+      - "Tables exist: ideas, tags, categories, idea_tags, content_items, content_fts, schema_version"
+      - "Indexes exist: idx_ideas_category, idx_ideas_status, idx_tags_name, etc."
+      - "FTS5 virtual table content_fts is created"
+      - "Triggers exist for FTS auto-sync"
+    cleanup: |
+      1. Close database connection
+      2. Delete temporary database file
+
+  - id: TC-002
+    requirement_id: DB-002
+    name: "Idea CRUD operations with tag associations"
+    type: integration
+    priority: critical
+    setup: |
+      1. Initialize empty database
+      2. Create sample tags: ['python', 'tutorial']
+    steps:
+      - "Create idea with title='Python Decorators', content='A guide...', tags=['python', 'tutorial']"
+      - "Retrieve idea by ID and verify all fields"
+      - "Update idea content to 'An advanced guide...'"
+      - "Verify updated_at timestamp changed"
+      - "Soft delete the idea"
+      - "Verify idea status is 'archived'"
+      - "Hard delete the idea"
+      - "Verify idea no longer exists"
+    expected_results:
+      - "Created idea has correct title, content, and associated tags"
+      - "Updated idea has new content and updated timestamp"
+      - "Soft-deleted idea has status='archived' but data preserved"
+      - "Hard-deleted idea is completely removed"
+      - "Tag associations are cleaned up on hard delete"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-003
+    requirement_id: DB-003
+    name: "Tag management with duplicate prevention"
+    type: unit
+    priority: high
+    setup: |
+      1. Initialize empty database
+    steps:
+      - "Create tag with name='Python'"
+      - "Attempt to create tag with name='python' (lowercase)"
+      - "Call get_or_create(['python', 'javascript', 'Python'])"
+      - "Delete tag 'javascript'"
+      - "Attempt to delete tag 'python' after creating an idea using it"
+    expected_results:
+      - "First tag created with normalized name 'python'"
+      - "Second attempt returns existing tag, no duplicate created"
+      - "get_or_create returns 2 tags (python, javascript), no duplicates"
+      - "Unused tag 'javascript' is successfully deleted"
+      - "Tag 'python' deletion is blocked due to existing references"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-004
+    requirement_id: DB-004
+    name: "Category hierarchy with cycle prevention"
+    type: integration
+    priority: high
+    setup: |
+      1. Initialize empty database
+    steps:
+      - "Create root category 'Technology'"
+      - "Create child category 'Programming' with parent 'Technology'"
+      - "Create grandchild 'Python' with parent 'Programming'"
+      - "Call get_descendants('Technology')"
+      - "Call get_path('Python')"
+      - "Attempt to set 'Technology' parent to 'Python' (would create cycle)"
+    expected_results:
+      - "All categories created with correct parent relationships"
+      - "get_descendants returns Programming and Python"
+      - "get_path returns [Technology, Programming, Python]"
+      - "Cycle attempt raises CircularReferenceError"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-005
+    requirement_id: DB-005
+    name: "Content items for multi-input capture"
+    type: integration
+    priority: critical
+    setup: |
+      1. Initialize empty database
+      2. Create sample idea
+    steps:
+      - "Create text content item linked to idea"
+      - "Create voice content item with transcription and audio path"
+      - "Create screenshot content item with OCR text and image path"
+      - "Retrieve idea with include_content=True"
+      - "Batch create 5 additional content items"
+    expected_results:
+      - "All content items created with correct type and data"
+      - "Retrieved idea includes list of 3 content items"
+      - "Content items have correct metadata (paths, types)"
+      - "Batch creation succeeds with all 5 items"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-006
+    requirement_id: DB-006
+    name: "FTS5 full-text search with filters"
+    type: integration
+    priority: critical
+    setup: |
+      1. Initialize empty database
+      2. Create ideas with content:
+         - "Python decorators tutorial" (tags: [python, tutorial])
+         - "JavaScript async guide" (tags: [javascript, tutorial])
+         - "Python machine learning" (tags: [python, advanced])
+      3. Create content items with various text
+    steps:
+      - "Search for 'python' - expect 2 results"
+      - "Search for '\"machine learning\"' (phrase) - expect 1 result"
+      - "Search for 'py*' (prefix) - expect 2+ results"
+      - "Search for 'tutorial' with tag filter ['python'] - expect 1 result"
+      - "Search with date range filter"
+    expected_results:
+      - "Basic search returns relevant ideas ranked by relevance"
+      - "Phrase search only returns exact matches"
+      - "Prefix search returns words starting with pattern"
+      - "Tag filter narrows results correctly"
+      - "Date filter excludes out-of-range results"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-007
+    requirement_id: DB-007
+    name: "Tag-based filtering and statistics"
+    type: unit
+    priority: high
+    setup: |
+      1. Initialize empty database
+      2. Create tags: python, javascript, tutorial, advanced
+      3. Create ideas with various tag combinations
+    steps:
+      - "Filter by single tag 'python'"
+      - "Filter by multiple tags ['python', 'tutorial'] with match_all=True"
+      - "Filter by multiple tags ['python', 'javascript'] with match_all=False"
+      - "Get tag statistics"
+    expected_results:
+      - "Single tag filter returns correct ideas"
+      - "AND filter returns only ideas with all specified tags"
+      - "OR filter returns ideas with any specified tag"
+      - "Statistics show correct count per tag"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-008
+    requirement_id: DB-008
+    name: "Transaction rollback on error"
+    type: integration
+    priority: high
+    setup: |
+      1. Initialize empty database
+      2. Create valid tag
+    steps:
+      - "Begin transaction to create idea with valid tag and invalid category_id"
+      - "Verify transaction rolls back on foreign key error"
+      - "Verify no partial data exists in database"
+    expected_results:
+      - "Transaction is rolled back completely"
+      - "No idea record exists"
+      - "No partial tag associations exist"
+      - "Database remains in consistent state"
+    cleanup: |
+      1. Close database connection
+
+  - id: TC-009
+    requirement_id: DB-NF-001
+    name: "Query performance benchmarks"
+    type: performance
+    priority: medium
+    setup: |
+      1. Initialize file-based database
+      2. Generate 10,000 ideas with content
+      3. Generate 1,000 tags
+      4. Create random associations
+    steps:
+      - "Benchmark: Query idea by ID (1000 iterations)"
+      - "Benchmark: Full-text search (100 iterations)"
+      - "Benchmark: Paginated list (100 iterations)"
+      - "Benchmark: Bulk insert 100 records"
+    expected_results:
+      - "ID query average < 10ms"
+      - "Full-text search average < 100ms"
+      - "Paginated list average < 50ms"
+      - "Bulk insert < 500ms"
+    cleanup: |
+      1. Close database connection
+      2. Delete benchmark database file
+
+  - id: TC-010
+    requirement_id: DB-NF-004
+    name: "In-memory database for testing"
+    type: unit
+    priority: medium
+    setup: |
+      1. Configure DatabaseManager with ':memory:' path
+    steps:
+      - "Initialize DatabaseManager"
+      - "Create schema"
+      - "Insert test data"
+      - "Close connection"
+      - "Re-initialize DatabaseManager with ':memory:'"
+    expected_results:
+      - "In-memory database works identically to file-based"
+      - "Data is isolated per connection"
+      - "No file system artifacts created"
+    cleanup: |
+      1. Close database connection
+
+# ==================== END OF SPECIFICATION ====================
