@@ -1,0 +1,76 @@
+{
+  "skill_name": "content-idea-generator",
+  "evals": [
+    {
+      "id": 1,
+      "name": "basic-idea-capture",
+      "prompt": "Capture a content idea: 'Python decorators tutorial for beginners' with tags #python #tutorial",
+      "expected_output": "The skill should save the idea to the database and return a confirmation message with the idea ID, title, and assigned tags. The idea should be queryable afterwards.",
+      "assertions": [
+        "Response contains confirmation message (e.g., '✅ Idea saved!')",
+        "Response includes the idea title 'Python decorators tutorial for beginners'",
+        "Response includes tags #python and #tutorial",
+        "Response includes a unique idea ID",
+        "Idea is stored in database and retrievable"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "search-functionality",
+      "prompt": "Search for ideas containing 'python' in the content library",
+      "expected_output": "The skill should return a list of ideas that match the search query 'python', showing relevant results with their titles, tags, and IDs.",
+      "assertions": [
+        "Response contains search indicator (e.g., '🔍 Found X ideas')",
+        "Search results include ideas with 'python' in title or content",
+        "Each result shows idea title",
+        "Each result shows associated tags",
+        "Results are ordered by relevance or date",
+        "Empty state handled gracefully when no matches found"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "daily-report-generation",
+      "prompt": "Generate a daily inspiration report showing today's captured ideas and insights",
+      "expected_output": "The skill should generate a comprehensive daily report with statistics (total ideas, input types), top tags, and clustered insights using HAC analysis.",
+      "assertions": [
+        "Report header indicates daily period",
+        "Statistics section shows total ideas count",
+        "Statistics show breakdown by input type (text/voice/screenshot)",
+        "Top tags are listed with counts",
+        "HAC clustering groups related ideas",
+        "Report includes timestamp or date",
+        "Report formatted for chat display"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "content-suggestion-generation",
+      "prompt": "Analyze my captured ideas and suggest new content topics I should create",
+      "expected_output": "The skill should analyze existing ideas using HAC clustering, identify patterns, and generate content suggestions with confidence scores and related idea references.",
+      "assertions": [
+        "Suggestions include a title",
+        "Suggestions include a description explaining the rationale",
+        "Each suggestion has a confidence score (0.0-1.0)",
+        "Suggestions reference related idea IDs",
+        "Suggested tags are provided based on cluster analysis",
+        "Suggestions are sorted by confidence (highest first)",
+        "Minimum confidence threshold is applied (default 0.5)"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "voice-input-capture",
+      "prompt": "Use voice input to capture an idea about 'machine learning best practices'",
+      "expected_output": "The skill should accept voice input, transcribe it using whisper.cpp, and save the transcribed text as an idea with appropriate metadata.",
+      "assertions": [
+        "Response acknowledges voice input mode (e.g., '🎙️ Send me a voice message')",
+        "Voice message is transcribed accurately",
+        "Transcribed text is saved as an idea",
+        "Idea is tagged with source type 'voice'",
+        "Idea is searchable after transcription",
+        "Transcription metadata is preserved"
+      ]
+    }
+  ]
+}
