@@ -298,3 +298,6 @@ python3 main.py test                    # Run tests
 ## License
 
 MIT License
+
+## Changelog
+- 2026-03-11: Skill audit upgrade — normalized SKILL.md frontmatter to `name` + `description`, revalidated trigger wording, and rechecked lightweight lint/smoke compatibility with OpenClaw.

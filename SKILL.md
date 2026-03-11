@@ -1,56 +1,7 @@
 ---
 name: content-idea-generator
-description: Content Idea Generator Skill - Capture, organize, and analyze content inspiration to generate actionable content ideas. Use when users want to capture content ideas, organize reading notes, extract insights from articles/videos, manage content library, generate content suggestions, or export notes to Obsidian. Triggers on "content idea", "capture inspiration", "reading notes", "content library", "organize articles", "Obsidian export", "content suggestion", "记灵感", "记笔记", "记下来", "灵感记录", "记录灵感", "笔记灵感", "收藏了", "码住", "这句好", "摘抄", "整理笔记", "素材库", "选题库", "内容库", "素材整理", "笔记整理", "选题整理", "建立素材库", "内容分析", "选题分析", "复盘整理", "内容规划", "选题策划", "Obsidian导出", "导出笔记", "笔记导出", "导出到Obsidian", "内容建议", "选题建议", "灵感推荐", "内容创意", "爆款选题".
-triggers:
-  # 捕捉类
-  - 记灵感
-  - 记笔记
-  - 记下来
-  - 灵感记录
-  - 记录灵感
-  - 笔记灵感
-  - 收藏了
-  - 码住
-  - 这句好
-  - 摘抄
-  # 整理类
-  - 整理笔记
-  - 素材库
-  - 选题库
-  - 内容库
-  - 素材整理
-  - 笔记整理
-  - 选题整理
-  - 建立素材库
-  # 分析类
-  - 内容分析
-  - 选题分析
-  - 复盘整理
-  - 内容规划
-  - 选题策划
-  # 导出类
-  - Obsidian导出
-  - 导出笔记
-  - 笔记导出
-  - 导出到Obsidian
-  # 建议类
-  - 内容建议
-  - 选题建议
-  - 灵感推荐
-  - 内容创意
-  - 爆款选题
-metadata:
-  openclaw:
-    emoji: "💡"
-    version: "1.0.0"
-    requires:
-      bins: ["python3", "pip3"]
-      env: []
-      python_packages: ["sqlite3", "nltk", "scikit-learn", "numpy"]
-    os: ["linux", "macos", "windows"]
-    install:
-      - pip3 install -r requirements.txt
-      - python3 -m nltk.downloader punkt stopwords
+description: >-
+  Content Idea Generator Skill - Capture, organize, and analyze content inspiration to generate actionable content ideas. Use when users want to capture content ideas, organize reading notes, extract insights from articles/videos, manage content library, generate content suggestions, or export notes to Obsidian. Triggers on "content idea", "capture inspiration", "reading notes", "content library", "organize articles", "Obsidian export", "content suggestion", "记灵感", "记笔记", "记下来", "灵感记录", "记录灵感", "笔记灵感", "收藏了", "码住", "这句好", "摘抄", "整理笔记", "素材库", "选题库", "内容库", "素材整理", "笔记整理", "选题整理", "建立素材库", "内容分析", "选题分析", "复盘整理", "内容规划", "选题策划", "Obsidian导出", "导出笔记", "笔记导出", "导出到Obsidian", "内容建议", "选题建议", "灵感推荐", "内容创意", "爆款选题".
 ---
 
 # Content Idea Generator
